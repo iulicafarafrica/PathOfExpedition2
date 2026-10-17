@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+/>
+<title>Path of Expedition</title>
+<style>
+  body { margin:0; background:#111827; color:#e5e7eb; font-family:Segoe UI,system-ui,sans-serif; font-size:14px; }
+  html, body { height:100%; }
+  .wrap { padding:14px; display:flex; flex-direction:column; gap:10px; min-height:100%; box-sizing:border-box; }
+  h1 { font-size:16px; margin:0; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  button { background:#374151; color:#e5e7eb; border:0; border-radius:6px; padding:8px 14px; cursor:pointer; font-size:13px; font-weight:600; }
+  button:hover { background:#4b5563; }
+  button.run { background:#166534; }
+  button.run.on { background:#991b1b; }
+  .corelbl { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; }
+  select { background:#374151; color:#e5e7eb; border:0; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:13px; font-weight:600; }
+  .status { font-size:12px; color:#9ca3af; min-height:16px; }
+  .list { background:#1f2937; border:1px solid #374151; border-radius:6px; padding:10px; min-height:120px; }
+  .row { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid #263042; }
+  .row:last-child { border-bottom:0; }
+  .name { color:#e5e7eb; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .qty { color:#93c5fd; font-weight:700; flex-shrink:0; padding:0 10px; }
+  .price { color:#fbbf24; font-weight:700; min-width:150px; text-align:right; flex-shrink:0; white-space:nowrap; }
+  .empty { color:#6b7280; font-size:12px; }
+  .err { color:#f87171; font-size:12px; }
+  .spacer { flex:1; min-height:12px; }
+  .footer { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#6b7280; padding-top:8px; border-top:1px solid #263042; margin-top:auto; }
+  .footer a { color:#fbbf24; text-decoration:none; font-weight:600; cursor:pointer; }
+  .footer a:hover { text-decoration:underline; }
+  .row.high .name, .row.high .price { color:#4ade80; }
+  .row.low .name, .row.low .price { color:#6b7280; font-weight:500; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Path of Expedition</h1>
+  <div class="btns">
+    <label class="corelbl">Liga:
+      <select id="league"></select>
+    </label>
+    <button id="sel">Select region</button>
+    <button id="scan">Scan now</button>
+    <button id="ref">Refresh prices</button>
+    <button id="dbg">Debug</button>
+  </div>
+  <div id="status" class="status">Pornesc…</div>
+  <div id="list" class="list"><div class="empty">Niciun preț încă.</div></div>
+  <div class="spacer"></div>
+  <div class="footer">
+    <span>made by iulian.icb</span>
+    <a id="bmc">☕ Buy me a coffee</a>
+  </div>
+</div>
+<script>
+const statusEl = document.getElementById("status");
+const listEl = document.getElementById("list");
+const leagueEl = document.getElementById("league");
+
+function render(rows, error) {
+  if (error) { listEl.innerHTML = `<div class="err">${error}</div>`; return; }
+  if (!rows.length) { listEl.innerHTML = `<div class="empty">Niciun pret inca. Deschide Runeshape Combinations in joc.</div>`; return; }
+  listEl.innerHTML = rows.map(r => {
+    const price = r.display ? r.display.text : "?";   // deja cu moneda (ex / div / c)
+    const name = r.matchedName || r.name;
+    const tier = r.tier ? ` ${r.tier}` : "";
+    return `<div class="row${tier}"><span class="name">${name}</span><span class="qty">${r.qty}x</span><span class="price">${price}</span></div>`;
+  }).join("");
+}
+
+leagueEl.onchange = async () => {
+  statusEl.textContent = "Schimb liga + încarc prețuri…";
+  await window.api.setLeague(leagueEl.value);
+  statusEl.textContent = "Liga: " + leagueEl.value;
+  const r = await window.api.scanNow();
+  render(r.rows, r.error);
+};
+
+async function boot() {
+  const cfg = await window.api.getConfig();
+  const leagues = cfg.availableLeagues || [];
+  leagueEl.innerHTML = leagues.map(l => `<option value="${l}">${l}</option>`).join("");
+  leagueEl.value = cfg.league || leagues[0] || "";
+  statusEl.textContent = cfg.region ? "Regiune setata. Scanez automat." : "Alege regiunea mai intai (Select region).";
+}
+
+document.getElementById("sel").onclick = async () => {
+  statusEl.textContent = "Trage o box peste panoul Runeshape, apoi dă Enter.";
+  await window.api.selectRegion();
+  statusEl.textContent = "Regiune salvată. Scanez automat.";
+};
+document.getElementById("scan").onclick = async () => {
+  statusEl.textContent = "Scanez…";
+  const r = await window.api.scanNow();
+  render(r.rows, r.error);
+  statusEl.textContent = `Gata: ${r.rows.length} rânduri.`;
+};
+document.getElementById("ref").onclick = async () => {
+  statusEl.textContent = "Încarc prețuri…";
+  const r = await window.api.refreshPrices();
+  statusEl.textContent = r.ok ? `Prețuri actualizate: ${r.count} itemuri.` : `Eroare: ${r.error}`;
+};
+document.getElementById("bmc").onclick = () => {
+  window.api.openExternal("https://buymeacoffee.com/iulian.icb");
+};
+document.getElementById("dbg").onclick = () => {
+  window.api.openDebug();
+};
+
+window.api.onScan((data) => {
+  render(data.rows, data.error);
+});
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+/>
+<style>
+  html,body { margin:0; height:100%; background:rgba(34,197,94,0.12); border:2px dashed #22c55e; overflow:hidden; }
+  /* bara de deasupra e dragabila (ca sa muti box-ul); restul e rezonabil */
+  .dragbar {
+    position:fixed; top:0; left:0; right:0; height:24px;
+    -webkit-app-region:drag; cursor:move;
+    background:rgba(34,197,94,0.25);
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font:12px Segoe UI;
+  }
+  .tip {
+    position:fixed; bottom:6px; left:6px;
+    background:rgba(17,24,39,.9); color:#fff; padding:5px 9px; border-radius:5px;
+    font:12px Segoe UI; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div class="dragbar">Mută-mă peste panou · resize din colțuri · Enter = salvează</div>
+<div class="tip">Enter = salvează regiunea · Esc = anulează</div>
+<script>
+window.addEventListener("error", (e) => {
+  // logueaza erorile in consola principalului
+  console.error("SELECT ERROR:", e.message, "at", e.filename, e.lineno);
+});
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    const region = {
+      x: window.screenX,
+      y: window.screenY,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+    window.api.sendRegion(region);
+    window.close();
+  }
+  if (e.key === "Escape") window.close();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+
+# Unused OCR training data (app uses Windows WinRT OCR, not tesseract)
+eng.traineddata
+
+# Local test artifacts
+screen.jpeg
+
+# OS
+.DS_Store
+Thumbs.db

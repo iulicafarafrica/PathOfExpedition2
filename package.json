@@ -1,0 +1,35 @@
+{
+  "name": "path-of-expedition",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PoE2 Expedition Runeshape price checker",
+  "main": "main.js",
+  "author": "iulian.icb",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.iulianicb.pathofexpedition",
+    "productName": "Path of Expedition",
+    "files": [
+      "main.js",
+      "preload.js",
+      "rows.js",
+      "ocr.ps1",
+      "renderer/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": ["portable", "nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
