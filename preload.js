@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld("api", {
   getDebug: () => ipcRenderer.invoke("get-debug"),
   checkOcr: () => ipcRenderer.invoke("check-ocr"),
   checkUpdate: () => ipcRenderer.invoke("check-update"),
-  doUpdate: (asset) => ipcRenderer.invoke("do-update", asset),
+  doUpdate: () => ipcRenderer.invoke("do-update"),
   scanNow: () => ipcRenderer.invoke("scan-now"),
   selectRegion: () => ipcRenderer.invoke("select-region"),
   refreshPrices: () => ipcRenderer.invoke("refresh-prices"),

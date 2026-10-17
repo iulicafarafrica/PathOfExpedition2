@@ -1,6 +1,5 @@
-// Parser robust pentru rânduri OCR din panoul Runeshape, portat după
-// PoeAncientsPriceHelper/OcrScanner.cs (MultiplierPattern, StripLeadingNoise, name gates).
-// Manole OCR-misread-uri: "1x" -> "IX"/"lx"/"ix", glife de rună (junk tokens), etc.
+// Parser robust pentru rânduri OCR din panoul Runeshape: multiplicatori,
+// zgomot de OCR ("1x" citit ca "IX"/"lx"/"ix", junk tokens) si name gates.
 
 // Normalizeaza un nume pentru matching: lowercase, doar litere+cifre, spații single.
 function normalizeName(s) {

@@ -130,14 +130,18 @@ function setPricesTime(ts) {
   pricesTimeEl.textContent = `Prices updated: ${date} ${time}`;
 }
 
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
 function render(rows, error) {
-  if (error) { listEl.innerHTML = `<div class="err">${error}</div>`; return; }
+  if (error) { listEl.innerHTML = `<div class="err">${esc(error)}</div>`; return; }
   if (!rows.length) { listEl.innerHTML = `<div class="empty">No items yet. Open Runeshape Combinations in game.</div>`; return; }
   listEl.innerHTML = rows.map(r => {
-    const price = r.display ? r.display.text : "?";
-    const name = r.matchedName || r.name;
+    const price = r.display ? esc(r.display.text) : "?";
+    const name = esc(r.matchedName || r.name);
     const tier = r.tier ? ` ${r.tier}` : "";
-    return `<div class="row${tier}"><span class="name">${name}</span><span class="qty">${r.qty}x</span><span class="price">${price}</span></div>`;
+    return `<div class="row${tier}"><span class="name">${name}</span><span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
   }).join("");
 }
 
@@ -201,11 +205,6 @@ let updateInfo = null; // { latest, current, releaseUrl, assets } cand e disponi
 const updBanner = document.getElementById("updBanner");
 const updBtn = document.getElementById("upd");
 
-function pickAsset(assets) {
-  if (!assets || !assets.length) return null;
-  return assets.find(a => !/setup/i.test(a.name)) || assets[0];
-}
-
 async function checkUpdateNow(silent) {
   try {
     const r = await window.api.checkUpdate();
@@ -233,13 +232,11 @@ updBanner.onclick = () => {
 
 updBtn.onclick = async () => {
   if (!updateInfo) { await checkUpdateNow(false); return; } // recheck daca nu stim inca
-  const asset = pickAsset(updateInfo.assets);
-  if (!asset) { statusEl.textContent = "No downloadable .exe in the release."; return; }
-  statusEl.textContent = `Downloading ${asset.name}…`;
+  statusEl.textContent = "Downloading update…";
   updBtn.disabled = true;
-  const r = await window.api.doUpdate(asset);
+  const r = await window.api.doUpdate(); // assetul e ales in main process
   updBtn.disabled = false;
-  if (r.ok) statusEl.textContent = `Update launched: ${asset.name}. Close this version.`;
+  if (r.ok) statusEl.textContent = `Update launched: ${r.name}. Close this version.`;
   else statusEl.textContent = "Update failed: " + r.error;
 };
 document.getElementById("dbg").onclick = () => {

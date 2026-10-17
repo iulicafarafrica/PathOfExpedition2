@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { spawn } = require("child_process");
+const crypto = require("crypto");
 const { parseLines } = require("./rows");
 
 // ---------- logging ----------
@@ -270,6 +271,11 @@ function pickAsset(assets) {
 
 async function doUpdate(asset) {
   if (!asset || !asset.url) throw new Error("No asset to download");
+  // Doar host-uri GitHub: asset-ul vine din release-ul nostru, niciodata un URL arbitrar.
+  const host = new URL(asset.url).hostname;
+  if (!/^(github\.com|objects\.githubusercontent\.com)$/i.test(host)) {
+    throw new Error("Blocked download host: " + host);
+  }
   const dest = path.join(os.tmpdir(), asset.name.replace(/[^\w.\- ]+/g, "_"));
   const r = await fetch(asset.url, { headers: { "User-Agent": NINJA_UA } });
   if (!r.ok) throw new Error(`Download failed (HTTP ${r.status})`);
@@ -288,12 +294,11 @@ async function doUpdate(asset) {
 // dar pe hardcore poate fi "exalted"). Normalizam totul la "per 1 Divine" mai jos.
 const NINJA_BASE = "https://poe.ninja/poe2/api/economy";
 const NINJA_UA = "PathOfExpedition/1.0 (desktop app; contact: local)";
-// Categoriile care pot aparea ca recompense in panoul Runeshape (ca la fork-uri).
 // Categoriile care apar efectiv ca recompense in panoul Runeshape/Expedition.
-// Identic cu cele doua fork-uri de referinta (Endre + pedro); restul categoriilor
-// nu apar niciodata in panou si doar maresc suprafata de potriviri fuzzy gresite.
+// Restul categoriilor din poe.ninja nu apar niciodata in panou si doar
+// maresc suprafata de potriviri fuzzy gresite.
 const NINJA_TYPES = ["Currency", "Runes", "Expedition", "Verisium", "UncutGems"];
-// Ligile oferite in dropdown (ca fork-ul pedro: AppConfig.AvailableLeagues).
+// Ligile oferite in dropdown.
 // Sirul e folosit VERBATIM ca parametru "league" al API-ului poe.ninja, asa ca
 // "HC X" e varianta Hardcore a ligii "X". "Standard" e liga permanenta (poe.ninja
 // are date reale de exchange pentru ea); "Hardcore" permanent e omis intentionat
@@ -365,7 +370,7 @@ async function fetchPrices(league) {
       if (key && !map[key]) map[key] = p;
     }
   }
-  // bucket pe lungimea cheii (folosit de pasul fuzzy, ca in fork-uri)
+  // bucket pe lungimea cheii (folosit de pasul fuzzy)
   const keysByLength = {};
   for (const k of Object.keys(map)) {
     (keysByLength[k.length] = keysByLength[k.length] || []).push(k);
@@ -400,7 +405,7 @@ function keySimilarity(a, b) {
   if (maxLen === 0) return 1;
   return 1 - levenshtein(a, b) / maxLen;
 }
-// fallback pentru cifre OCR confundate cu litere (0->o, 1->l, 5->s, 8->b), ca in fork-uri
+// fallback pentru cifre OCR confundate cu litere (0->o, 1->l, 5->s, 8->b)
 function digitFold(s) {
   return s.replace(/0/g, "o").replace(/1/g, "l").replace(/5/g, "s").replace(/8/g, "b");
 }
@@ -408,7 +413,7 @@ function digitFold(s) {
 function isUncutGem(key) {
   return /uncut (skill|spirit|support) gem/.test(key);
 }
-// prag-uri identice cu fork-urile (price-match.ts / ScanEngine.cs)
+// prag-uri pentru matching
 const PREFIX_MIN_LENGTH = 10;
 const FUZZY_MIN_LENGTH = 6;
 const FUZZY_THRESHOLD = 0.84;
@@ -428,7 +433,7 @@ function bestFuzzyMatch(name) {
   return bestKey ? { key: bestKey, score: bestScore } : null;
 }
 // exact -> digit-fold exact -> prefix (>=10) -> fuzzy (>=6, bucket ±3, 0.84)
-// Algoritm portat din ambele fork-uri. NU folosim "contains": altfel "mind rune"
+// NU folosim "contains": altfel "mind rune"
 // s-ar potrivi gresit cu "perfect mind rune".
 function lookupPrice(name) {
   const key = matchKey(name);
@@ -459,12 +464,12 @@ function lookupPrice(name) {
   return null;
 }
 
-// ---------- afisare preț in moneda corecta (logica autoCurrency din fork-uri) ----------
-// Regula (identica cu Exiled Exchange 2 / PoeAncientsPriceHelper):
+// ---------- afisare preț in moneda corecta (logica autoCurrency) ----------
+// Regula (identica cu afisarea de pe site-ul poe.ninja):
 //   pret in Divine >= ~1  -> afisam in Divine
 //   pret in Divine <  ~1  -> afisam in moneda "core" (Exalted, fallback Chaos)
 // Adica itemii ieftini apar in Exalted, iar cei scumpi in Divine.
-// Rotunjire de AFIȘARE, portata 1:1 din fork (Prices.ts -> displayRounding).
+// Rotunjire de AFIȘARE, identica cu afisarea de pe poe.ninja (displayRounding).
 // Diferenta fata de vechiul formatValue: sub 10 se face toFixed(1) (nu toFixed(2)),
 // peste 2250 se scurteaza k/m/b/t, restul se rotunjeste la intreg.
 function formatValue(v, truncateLargeNumbers = true) {
@@ -478,7 +483,7 @@ function formatValue(v, truncateLargeNumbers = true) {
   }
   return String(Math.round(v));
 }
-// moneda core pentru itemii ieftini: Exalted (ca la fork-uri), fallback Chaos.
+// moneda core pentru itemii ieftini: Exalted, fallback Chaos.
 function coreCurrency() {
   if (xchgRates.exalted) return { id: "exalted", abbrev: "ex", perDiv: xchgRates.exalted };
   if (xchgRates.chaos) return { id: "chaos", abbrev: "c", perDiv: xchgRates.chaos };
@@ -621,7 +626,7 @@ async function doScan() {
     let shot = await captureRegion(config.region);
     // salvam PNG in temp (cu path Windows ca sa mearga WinRT StorageFile)
     const img = nativeImage.createFromBitmap(Buffer.from(shot.data), { width: shot.width, height: shot.height });
-    const tmp = path.join(os.tmpdir(), `xpc-${Date.now()}.png`).replace(/\//g, "\\");
+    const tmp = path.join(os.tmpdir(), `xpc-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.png`).replace(/\//g, "\\");
     fs.writeFileSync(tmp, img.toPNG());
     const result = await ocrRecognize(tmp);
     try { fs.unlinkSync(tmp); } catch {}
@@ -642,7 +647,7 @@ async function doScan() {
       r.price = p ? p.price : null;            // pret UNITAR in Divine (raw)
       r.matchedName = p ? p.name : null;
       r.totalDivine = p ? p.price * qty : null;  // TOTALUL stack-ului in Divine (pt tier)
-      // Pretul afisat = TOTALUL stack-ului (ca la fork-uri); pentru qty>1 aratam si unitar.
+      // Pretul afisat = TOTALUL stack-ului; pentru qty>1 aratam si unitar.
       const total = p ? displayPrice(p.price * qty, "auto") : null;
       const unit = (p && qty > 1) ? displayPrice(p.price, "auto") : null;
       r.display = total
@@ -651,7 +656,7 @@ async function doScan() {
       if (!p && !r.explicit) { log("doScan: FILTRU (chat/zgomot):", JSON.stringify(r.raw)); continue; }
       kept.push(r);
     }
-    // Tier pe valoare (ca Endre: valueTier high/mid/low) -> pentru colorare in UI.
+    // Tier pe valoare (valueTier high/mid/low) -> pentru colorare in UI.
     const priced = kept.filter((r) => r.totalDivine != null).map((r) => r.totalDivine);
     if (priced.length) {
       const max = Math.max(...priced);
@@ -689,18 +694,31 @@ ipcMain.handle("get-config", () => ({ ...config, availableLeagues: AVAILABLE_LEA
 ipcMain.handle("check-ocr", () => checkOcrHealth());
 // update: verificare ultimul release GitHub + descarcare/lanare
 ipcMain.handle("check-update", () => checkUpdate());
-ipcMain.handle("do-update", async (_e, asset) => {
+ipcMain.handle("do-update", async () => {
+  // Asset-ul e ales in main process, nu in renderer: rendererul poate doar SORI
+  // update-ul, niciodata ce se descarca/lanseaza (altfel un XSS in renderer
+  // ar putea descarca si executa orice URL).
   try {
+    const info = await checkUpdate();
+    if (!info.ok) throw new Error(info.error || "Update check failed");
+    if (!info.updateAvailable) throw new Error("No update available");
+    const asset = pickAsset(info.assets);
+    if (!asset) throw new Error("No downloadable asset in the release");
     const dest = await doUpdate(asset);
-    return { ok: true, dest };
+    return { ok: true, dest, name: asset.name };
   } catch (e) {
     log("update failed: " + e);
     return { ok: false, error: String(e) };
   }
 });
-// deschide un link extern in browser-ul implicit (used by footer "Buy me a coffee")
+// deschide un link extern in browserul implicit; doar URL-uri allowlist-uite
+// (buymeacoffee + release page), ca un renderer compromis sa nu poata deschide orice.
+const EXTERNAL_ALLOW = [
+  /^https:\/\/buymeacoffee\.com\/iulian\.icb\/?$/i,
+  /^https:\/\/github\.com\/iulicafarafrica\/PathOfExpedition2(\/|$)/i,
+];
 ipcMain.handle("open-external", (_e, url) => {
-  if (typeof url === "string" && /^https:\/\//i.test(url)) shell.openExternal(url);
+  if (typeof url === "string" && EXTERNAL_ALLOW.some((re) => re.test(url))) shell.openExternal(url);
 });
 // buffer de debug: loguri + liniile OCR brute din ultimul scan
 ipcMain.handle("get-debug", () => ({
@@ -763,6 +781,13 @@ ipcMain.handle("select-region", async () => {
     ipcMain.once("region-selected", (_e, region) => {
       log("region-selected: primit", JSON.stringify(region));
       selectOpen = false;
+      const r = region || {};
+      if (![r.x, r.y, r.width, r.height].every((n) => Number.isFinite(n)) || r.width < 40 || r.height < 30) {
+        log("region rejected: geometrie invalida");
+        try { sel.close(); } catch {}
+        resolve(null);
+        return;
+      }
       try {
         // completam displayId cu display-ul primar (sau cel mai apropiat)
         const disp = screen.getDisplayNearestPoint({ x: region.x + region.width / 2, y: region.y + region.height / 2 });
@@ -792,7 +817,7 @@ app.whenReady().then(async () => {
   try { await fetchPrices(config.league || "Forbidden Rites"); } catch {}
   // daca regiunea e deja salvata, porneste scanarea automata (fara buton Start)
   if (config.region) startPoll();
-  // auto-refresh preturi la 30 min (ca fork-ul: UPDATE_INTERVAL_MS)
+  // auto-refresh preturi la 30 min
   setInterval(async () => {
     try {
       await fetchPrices(config.league || "Forbidden Rites");

@@ -74,7 +74,7 @@ Doar endpoint-urile de **economy overview** (POE1 + POE2). Niciun secret — le 
 - Facem un map: `name(lower) -> {price, id}`, unde `price` e normalizat in Divine
   (`primaryValue * divinePerPrimary`, ca sa mearga si pe ligi cu `core.primary = "exalted"`)
 - La scan, OCR-ul dă nume (ex "Greater Orb of Augmentation"), le căutăm în map
-- Afișăm prețul cu logica **autoCurrency** (ca EX2 / PoeAncientsPriceHelper):
+- Afișăm prețul cu logica **autoCurrency** (identică cu afișarea de pe site-ul poe.ninja):
   - pret ~>= 1 Divine -> in **Divine**
   - pret < 1 Divine -> in **Exalted** (moneda core; fallback Chaos)
   - modul manual (Div / Exalted / Chaos) ramane disponibil din dropdown
