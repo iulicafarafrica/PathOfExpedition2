@@ -4,8 +4,6 @@
 
 A small Windows desktop app for Path of Exile 2. It reads the Expedition reward panel from your screen and tells you what those drops are actually worth, using live prices from poe.ninja.
 
-I made it because I was tired of mentally converting "2x Greater Orb of Transmutation" into exalted every time a run closed out.
-
 **This project is not affiliated with, endorsed by, or sponsored by Grinding Gear Games.** "Path of Exile", "Path of Exile 2", and related marks belong to Grinding Gear Games. This tool is a fan-made convenience; GGG's ToS apply to everything you do in-game. It is also not affiliated with poe.ninja — the app just uses their public exchange API for prices, same as their own website does.
 
 ---
