@@ -10,7 +10,7 @@ It started as a fork of Exiled Exchange 2, got rewritten until it stopped being 
 
 ## Quick start
 
-1. Grab the latest `.exe` from [Releases](https://github.com/iulicafarafrica/PathOfExpedition2/releases) (the portable one is enough, no install needed).
+1. Grab the latest `.exe` from [Releases](https://github.com/iulicafarafrica/PathOfExpedition2/releases) (the portable one is enough, no install needed). If you'd like, run it through [VirusTotal](https://www.virustotal.com/gui/file-analysis/ZDUxNWFlNzU4Yjk5MjA0ZDBhYmUwMDJiZmEzYThlM2Q6MTc5MjI1NzEzNg==) first — this is the current build, and the project is fully open source so you can also just read the code or build it yourself (see [Open source & security](#open-source--security)).
 2. Run it and pick your **league** from the dropdown.
 3. In-game, open the **Runeshape Combinations** panel.
 4. Click **Select region**, drag the green box over the reward panel and resize it to cover the list, then press **Enter**.
@@ -66,6 +66,32 @@ If in-game text comes out garbled or items don't match, hit **Check OCR** in the
 - **GitHub Releases API** — update detection and download.
 
 Dev notes: `npm run dev` runs it unpackaged, `npm run dist` builds both executables into `dist/`.
+
+## Open source & security
+
+The whole app is in this repository, [MIT licensed](LICENSE), and there is no hidden or "proprietary" part. The `.exe` in the releases is exactly this source built with electron-builder — nothing is injected after the fact.
+
+**What it talks to over the network** (full list, verifiable in `main.js`):
+
+- `poe.ninja` exchange API — prices (the same endpoint their website uses)
+- `api.github.com` — this repo's release feed, for the update check
+- the release's `.exe` download URL — **only** when you press "Update now"
+- buymeacoffee.com — **only** when you click the footer link
+
+That's it. No telemetry, no analytics, no other endpoints. Screenshots and OCR text are processed locally and never uploaded anywhere. Your settings live in a single `config.json` under your Windows user data folder (`%APPDATA%\path-of-expedition`).
+
+**Build it yourself** (Windows, Node 18+):
+
+```
+git clone https://github.com/iulicafarafrica/PathOfExpedition2
+cd PathOfExpedition2
+npm install
+npm run dist
+```
+
+The executables land in `dist/`. `package-lock.json` pins the dependencies, so a fresh clone builds the same thing.
+
+**VirusTotal scan of the current build:** <https://www.virustotal.com/gui/file-analysis/ZDUxNWFlNzU4Yjk5MjA0ZDBhYmUwMDJiZmEzYThlM2Q6MTc5MjI1NzEzNg==>. (New releases get a new hash — feel free to re-scan before running.)
 
 ## Troubleshooting
 
