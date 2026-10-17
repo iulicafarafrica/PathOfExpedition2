@@ -309,6 +309,15 @@ const PRICE_TTL = 5 * 60 * 1000;               // 5 min (respectam cache-ul lor 
 // rate-uri: cate unitati de moneda core per 1 Divine (calculate din core.rates al API-ului)
 let xchgRates = { chaos: null, exalted: null };
 
+// sparkline de la poe.ninja: {totalChange: %, data: [%/zi]} (7 zile).
+// totalChange = variatia totala pe perioada -> trendul afisat (sageta dupa nume).
+function sparkTrend(sp) {
+  const t = sp && typeof sp === "object" ? parseFloat(sp.totalChange) : NaN;
+  if (!Number.isFinite(t)) return null;
+  if (t > 0.5) return "up";
+  if (t < -0.5) return "down";
+  return "flat";
+}
 function normName(s) {
   return (s || "")
     .toLowerCase()
@@ -353,7 +362,7 @@ async function fetchPrices(league) {
         if (!it || !it.name) continue;
         // pretul in Divine: primaryValue e in moneda primara -> convertim
         const divine = (line.primaryValue || 0) * (divPerPrimary || 1);
-        out.push({ id: line.id, name: it.name, price: divine, category: it.category });
+        out.push({ id: line.id, name: it.name, price: divine, category: it.category, trend: sparkTrend(line.sparkline) });
       }
       if (out.length) log("fetchPrices:", type, "->", out.length, "itemuri (primary=" + primary + ")");
       return out;
@@ -644,8 +653,9 @@ async function doScan() {
     for (const r of rows) {
       const p = lookupPrice(r.name);
       const qty = r.qty || 1;
-      r.price = p ? p.price : null;            // pret UNITAR in Divine (raw)
-      r.matchedName = p ? p.name : null;
+        r.price = p ? p.price : null;            // pret UNITAR in Divine (raw)
+        r.matchedName = p ? p.name : null;
+        r.trend = p ? p.trend : null;            // "up" | "down" | "flat" | null
       r.totalDivine = p ? p.price * qty : null;  // TOTALUL stack-ului in Divine (pt tier)
       // Pretul afisat = TOTALUL stack-ului; pentru qty>1 aratam si unitar.
       const total = p ? displayPrice(p.price * qty, "auto") : null;

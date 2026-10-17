@@ -66,6 +66,9 @@
   }
   .row:last-child { border-bottom:0; }
   .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; color:var(--ink); }
+  .trend { flex-shrink:0; font-size:11px; }
+  .trend.up { color:var(--green); }
+  .trend.down { color:#8a2a2a; }
   .qty { flex-shrink:0; padding:0 10px; font-weight:bold; color:var(--ink-soft); font-size:14px; }
   .price { flex-shrink:0; min-width:150px; text-align:right; white-space:nowrap; font-weight:bold; font-size:15px; color:var(--gold); }
   .row.high .name, .row.high .price { color:var(--green); }
@@ -141,7 +144,8 @@ function render(rows, error) {
     const price = r.display ? esc(r.display.text) : "?";
     const name = esc(r.matchedName || r.name);
     const tier = r.tier ? ` ${r.tier}` : "";
-    return `<div class="row${tier}"><span class="name">${name}</span><span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
+    const trend = r.trend === "up" ? '<span class="trend up">▲</span>' : r.trend === "down" ? '<span class="trend down">▼</span>' : "";
+    return `<div class="row${tier}"><span class="name">${name}</span>${trend}<span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
   }).join("");
 }
 
