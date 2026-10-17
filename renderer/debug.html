@@ -6,32 +6,40 @@
 />
 <title>Debug — Path of Expedition</title>
 <style>
-  body { margin:0; background:#111827; color:#e5e7eb; font-family:Consolas,Segoe UI,monospace; font-size:12px; }
-  .wrap { padding:12px; display:flex; flex-direction:column; gap:10px; height:100vh; box-sizing:border-box; }
-  h1 { font-size:14px; margin:0; }
-  .meta { color:#9ca3af; }
-  .meta b { color:#e5e7eb; }
+  :root { --parch:#d9c9a3; --ink:#3a2c18; --ink-soft:#5c4a30; --line:#8a6f47; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Georgia,"Times New Roman",serif; color:var(--ink);
+    background:radial-gradient(ellipse at 50% 0%, #e7d9b6 0%, #cbb890 60%, #b49b6e 100%); }
+  .wrap { padding:12px 14px; display:flex; flex-direction:column; gap:10px; height:100vh; }
+  h1 { font-size:16px; margin:0; text-align:center; }
+  .meta { color:var(--ink-soft); font-size:13px; text-align:center; }
+  .meta b { color:var(--ink); }
   .cols { display:flex; gap:10px; flex:1; min-height:0; }
   .col { flex:1; display:flex; flex-direction:column; min-width:0; }
-  .col h2 { font-size:12px; color:#93c5fd; margin:0 0 4px; text-transform:uppercase; letter-spacing:.5px; }
-  .box { background:#1f2937; border:1px solid #374151; border-radius:6px; padding:8px; overflow:auto; flex:1; white-space:pre-wrap; word-break:break-word; }
-  .ocr { color:#fbbf24; }
-  .logs { color:#9ca3af; }
-  .empty { color:#6b7280; font-style:italic; }
+  .col h2 { font-size:12px; color:var(--ink-soft); margin:0 0 4px; text-transform:uppercase; letter-spacing:.5px; }
+  .box {
+    background:#e4d6b4; border:1px solid var(--line); border-radius:3px;
+    padding:8px; overflow:auto; flex:1; white-space:pre-wrap; word-break:break-word;
+    font-family:Consolas,monospace; font-size:12px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);
+  }
+  .ocr { color:#5a3e12; }
+  .logs { color:#4a3c28; }
+  .empty { color:var(--ink-soft); font-style:italic; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Debug</h1>
-  <div id="meta" class="meta">Loding…</div>
+  <div id="meta" class="meta">Loading…</div>
   <div class="cols">
     <div class="col">
-      <h2>OCR brut (ultimul scan)</h2>
-      <div id="ocr" class="box ocr"><span class="empty">Nicio linie încă.</span></div>
+      <h2>Raw OCR (last scan)</h2>
+      <div id="ocr" class="box ocr"><span class="empty">No lines yet.</span></div>
     </div>
     <div class="col">
-      <h2>Log app</h2>
-      <div id="logs" class="box logs"><span class="empty">Fără loguri.</span></div>
+      <h2>App log</h2>
+      <div id="logs" class="box logs"><span class="empty">No logs.</span></div>
     </div>
   </div>
 </div>
@@ -46,17 +54,17 @@ function esc(s) {
 
 async function refresh() {
   const d = await window.api.getDebug();
-  const pricesAgo = d.pricesAt ? Math.round((Date.now() - d.pricesAt) / 1000) + "s în urmă" : "niciodată";
+  const pricesAgo = d.pricesAt ? Math.round((Date.now() - d.pricesAt) / 1000) + "s ago" : "never";
   metaEl.innerHTML =
-    `Liga: <b>${esc(d.league || "?")}</b> &nbsp;|&nbsp; Regiune: <b>${d.region ? "setată" : "nesetată"}</b> &nbsp;|&nbsp; Prețuri: <b>${pricesAgo}</b>`;
+    `League: <b>${esc(d.league || "?")}</b> &nbsp;|&nbsp; Region: <b>${d.region ? "set" : "not set"}</b> &nbsp;|&nbsp; Prices: <b>${pricesAgo}</b>`;
 
   ocrEl.innerHTML = d.ocrLines.length
     ? d.ocrLines.map((t, i) => `${i + 1}. ${esc(t)}`).join("\n")
-    : '<span class="empty">Nicio linie OCR (scan pornit încă?).</span>';
+    : '<span class="empty">No OCR lines (scan not started yet?).</span>';
 
   logsEl.innerHTML = d.logs.length
     ? d.logs.slice().reverse().map(esc).join("\n")
-    : '<span class="empty">Fără loguri.</span>';
+    : '<span class="empty">No logs.</span>';
 }
 
 refresh();

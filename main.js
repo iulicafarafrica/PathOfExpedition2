@@ -148,14 +148,138 @@ function ensureOcrProc() {
 }
 function ocrRecognize(imagePath) {
   return new Promise((resolve) => {
+    // Daca un request anterior inca asteapta (PowerShell/WinRT blocat), il anulam
+    // si recream procesul - altfel noul request scrie intr-un proces blocat si pica.
+    if (ocrPending) {
+      log("OCR: proces ocupat, resetez (self-heal)");
+      try { if (ocrProc) ocrProc.kill(); } catch {}
+      ocrProc = null;
+      ocrPending = null;
+    }
     const proc = ensureOcrProc();
-    const timer = setTimeout(() => { ocrPending = null; resolve({ ok: false, error: "OCR timeout" }); }, 15000);
-    ocrPending = (result) => { clearTimeout(timer); resolve(result); };
+    const timer = setTimeout(() => {
+      // Proces blocat: il omoram ca urmatorul scan sa porneasca proaspat.
+      log("OCR timeout: omor procesul OCR (self-heal)");
+      try { proc.kill(); } catch {}
+      if (ocrProc === proc) ocrProc = null;
+      ocrPending = null;
+      resolve({ ok: false, error: "OCR timeout" });
+    }, 20000);
+    ocrPending = (result) => { clearTimeout(timer); ocrPending = null; resolve(result); };
     try { proc.stdin.write(imagePath + "\n"); }
-    catch (e) { clearTimeout(timer); ocrPending = null; resolve({ ok: false, error: String(e) }); }
+    catch (e) {
+      clearTimeout(timer);
+      try { proc.kill(); } catch {}
+      if (ocrProc === proc) ocrProc = null;
+      ocrPending = null;
+      resolve({ ok: false, error: String(e) });
+    }
   });
 }
 let lastRows = [];
+
+// ---------- health-check OCR (butonul "Check OCR") ----------
+// Verifica daca Windows OCR (WinRT Windows.Media.Ocr) e disponibil, ce limbi sunt
+// instalate si daca motorul se creeaza din limbile profilului. Returneaza JSON.
+const OCR_CHECK_PS1 = [
+  "try {",
+  "  Add-Type -AssemblyName System.Runtime.WindowsRuntime",
+  "  $null = [Windows.Media.Ocr.OcrEngine,Windows.Media.Ocr,ContentType=WindowsRuntime]",
+  "  $langs = @()",
+  "  try { $langs = @([Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages | ForEach-Object { $_.LanguageTag }) } catch {}",
+  "  $engine = $null",
+  "  try { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() } catch {}",
+  "  $obj = [ordered]@{ ok = $true; engine = ($null -ne $engine); langs = $langs }",
+  "  ConvertTo-Json -InputObject $obj -Compress",
+  "} catch {",
+  "  ConvertTo-Json -InputObject ([ordered]@{ ok = $false; error = $_.Exception.Message }) -Compress",
+  "}",
+].join("\n");
+
+function checkOcrHealth() {
+  return new Promise((resolve) => {
+    let p;
+    try {
+      p = spawn(
+        "powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-NoLogo", "-ExecutionPolicy", "Bypass", "-Command", OCR_CHECK_PS1],
+        { windowsHide: true }
+      );
+    } catch (e) { return resolve({ ok: false, error: String(e) }); }
+    let out = "", err = "";
+    p.stdout.on("data", (d) => { out += d; });
+    p.stderr.on("data", (d) => { err += d; });
+    p.on("error", (e) => resolve({ ok: false, error: String(e) }));
+    p.on("close", () => {
+      const raw = out.trim();
+      try { resolve(JSON.parse(raw)); }
+      catch { resolve({ ok: false, error: (err.trim() || raw || "Unknown OCR error") }); }
+    });
+  });
+}
+
+// ---------- update (GitHub Releases) ----------
+// Verificam ultimul release din repo; daca versiunea e mai noua ca cea curenta,
+// aratam "Update available". Butonul Update descarca noul exe si il lanseaza.
+const GITHUB_REPO = "iulicafarafrica/PathOfExpedition2";
+const GITHUB_API_LATEST = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+
+function parseVer(v) {
+  return String(v || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
+}
+function isNewerVer(latest, current) {
+  const a = parseVer(latest), b = parseVer(current);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] || 0) > (b[i] || 0)) return true;
+    if ((a[i] || 0) < (b[i] || 0)) return false;
+  }
+  return false;
+}
+
+async function checkUpdate() {
+  try {
+    const r = await fetch(GITHUB_API_LATEST, {
+      headers: { "User-Agent": NINJA_UA, "Accept": "application/vnd.github+json" },
+    });
+    if (r.status === 404) return { ok: true, updateAvailable: false, reason: "no-releases" };
+    if (!r.ok) return { ok: false, status: r.status };
+    const j = await r.json();
+    const latest = String(j.tag_name || "").replace(/^v/i, "");
+    const cur = app.getVersion();
+    const assets = (j.assets || [])
+      .filter((a) => /\.exe$/i.test(a.name))
+      .map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size }));
+    return {
+      ok: true,
+      current: cur,
+      latest,
+      updateAvailable: isNewerVer(latest, cur),
+      releaseUrl: j.html_url,
+      assets,
+    };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+// Alege asset-ul: preferim exe-ul PORTABLE (fara "Setup" in nume), altfel orice .exe.
+function pickAsset(assets) {
+  if (!assets || !assets.length) return null;
+  return assets.find((a) => !/setup/i.test(a.name)) || assets[0];
+}
+
+async function doUpdate(asset) {
+  if (!asset || !asset.url) throw new Error("No asset to download");
+  const dest = path.join(os.tmpdir(), asset.name.replace(/[^\w.\- ]+/g, "_"));
+  const r = await fetch(asset.url, { headers: { "User-Agent": NINJA_UA } });
+  if (!r.ok) throw new Error(`Download failed (HTTP ${r.status})`);
+  const buf = Buffer.from(await r.arrayBuffer());
+  fs.writeFileSync(dest, buf);
+  log(`update: downloaded ${asset.name} (${buf.length} bytes) -> ${dest}`);
+  const launchErr = await shell.openPath(dest); // pornește noul exe / installerul
+  if (launchErr) throw new Error(launchErr);
+  return dest;
+}
 
 // ---------- prețuri PoE Ninja ----------
 // Endpoint: GET /poe2/api/economy/exchange/current/overview?league=...&type=...
@@ -435,6 +559,7 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
+  win.setMenuBarVisibility(false);   // fara meniul File/Edit/View (neprofesional)
   win.on("close", () => {
     const r = win.getBounds();
     config.window = { x: r.x, y: r.y, width: r.width, height: r.height };
@@ -490,7 +615,7 @@ async function doScan() {
   log("doScan: START");
   if (selectOpen) { log("doScan: selectOpen, sarit"); return { rows: [], error: null };
   }
-  if (!config.region) { log("doScan: fara regiune"); return { rows: [], error: "Setează regiunea mai întâi (Select region)." };
+  if (!config.region) { log("doScan: fara regiune"); return { rows: [], error: "Choose a region first (Select region)." };
   }
   try {
     let shot = await captureRegion(config.region);
@@ -559,7 +684,20 @@ function stopPoll() {
 }
 
 // ---------- IPC ----------
-ipcMain.handle("get-config", () => ({ ...config, availableLeagues: AVAILABLE_LEAGUES }));
+ipcMain.handle("get-config", () => ({ ...config, availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt }));
+// health-check Windows OCR (butonul "Check OCR")
+ipcMain.handle("check-ocr", () => checkOcrHealth());
+// update: verificare ultimul release GitHub + descarcare/lanare
+ipcMain.handle("check-update", () => checkUpdate());
+ipcMain.handle("do-update", async (_e, asset) => {
+  try {
+    const dest = await doUpdate(asset);
+    return { ok: true, dest };
+  } catch (e) {
+    log("update failed: " + e);
+    return { ok: false, error: String(e) };
+  }
+});
 // deschide un link extern in browser-ul implicit (used by footer "Buy me a coffee")
 ipcMain.handle("open-external", (_e, url) => {
   if (typeof url === "string" && /^https:\/\//i.test(url)) shell.openExternal(url);

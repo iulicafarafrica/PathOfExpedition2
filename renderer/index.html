@@ -2,53 +2,114 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:"
 />
 <title>Path of Expedition</title>
 <style>
-  body { margin:0; background:#111827; color:#e5e7eb; font-family:Segoe UI,system-ui,sans-serif; font-size:14px; }
+  @font-face {
+    font-family: "Norse";
+    src: url("fonts/Norse.otf") format("opentype");
+    font-weight: normal;
+  }
+  @font-face {
+    font-family: "Norse";
+    src: url("fonts/Norse-Bold.otf") format("opentype");
+    font-weight: bold;
+  }
+  :root {
+    --parch: #d9c9a3;
+    --parch-2: #cbb890;
+    --ink: #3a2c18;
+    --ink-soft: #5c4a30;
+    --line: #8a6f47;
+    --gold: #8a6a1f;
+    --green: #2f6b34;
+    --btn: #c2ad82;
+    --btn-hi: #d6c69c;
+  }
+  * { box-sizing: border-box; }
   html, body { height:100%; }
-  .wrap { padding:14px; display:flex; flex-direction:column; gap:10px; min-height:100%; box-sizing:border-box; }
-  h1 { font-size:16px; margin:0; }
-  .btns { display:flex; gap:8px; flex-wrap:wrap; }
-  button { background:#374151; color:#e5e7eb; border:0; border-radius:6px; padding:8px 14px; cursor:pointer; font-size:13px; font-weight:600; }
-  button:hover { background:#4b5563; }
-  button.run { background:#166534; }
-  button.run.on { background:#991b1b; }
-  .corelbl { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; }
-  select { background:#374151; color:#e5e7eb; border:0; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:13px; font-weight:600; }
-  .status { font-size:12px; color:#9ca3af; min-height:16px; }
-  .list { background:#1f2937; border:1px solid #374151; border-radius:6px; padding:10px; min-height:120px; }
-  .row { display:flex; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid #263042; }
+  body {
+    margin:0;
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse at 50% 0%, #e7d9b6 0%, #cbb890 60%, #b49b6e 100%);
+  }
+  .wrap { padding:16px 18px; display:flex; flex-direction:column; gap:12px; min-height:100%; }
+  h1 {
+    font-family: "Norse", Georgia, serif;
+    font-size:30px; margin:0 0 2px; text-align:center; letter-spacing:1px;
+    color:var(--ink); text-shadow:0 1px 0 rgba(255,255,255,.35);
+  }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .corelbl { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:bold; }
+  button, select {
+    font-family:inherit; font-size:13px; font-weight:bold; color:var(--ink);
+    background:linear-gradient(#d8c89e, var(--btn));
+    border:1px solid var(--line); border-radius:3px;
+    padding:6px 12px; cursor:pointer;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 1px 2px rgba(0,0,0,.25);
+  }
+  button:hover, select:hover { background:linear-gradient(#e2d4ae, var(--btn-hi)); }
+  button:active { box-shadow:inset 0 1px 3px rgba(0,0,0,.35); }
+  .status { font-size:13px; color:var(--ink-soft); text-align:center; min-height:16px; font-style:italic; }
+  .list {
+    background:linear-gradient(#e0d1ad, #d3c19a);
+    border:2px solid var(--line); border-radius:4px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.25);
+    padding:6px 10px; min-height:140px;
+  }
+  .row {
+    display:flex; align-items:baseline; gap:8px; padding:7px 4px;
+    border-bottom:1px solid rgba(138,111,71,.35);
+  }
   .row:last-child { border-bottom:0; }
-  .name { color:#e5e7eb; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .qty { color:#93c5fd; font-weight:700; flex-shrink:0; padding:0 10px; }
-  .price { color:#fbbf24; font-weight:700; min-width:150px; text-align:right; flex-shrink:0; white-space:nowrap; }
-  .empty { color:#6b7280; font-size:12px; }
-  .err { color:#f87171; font-size:12px; }
+  .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; color:var(--ink); }
+  .qty { flex-shrink:0; padding:0 10px; font-weight:bold; color:var(--ink-soft); font-size:14px; }
+  .price { flex-shrink:0; min-width:150px; text-align:right; white-space:nowrap; font-weight:bold; font-size:15px; color:var(--gold); }
+  .row.high .name, .row.high .price { color:var(--green); }
+  .row.low .name { color:#5a4830; }
+  .row.low .price { color:#9a8760; }
+  .empty { color:var(--ink-soft); font-size:13px; font-style:italic; padding:12px 4px; }
+  .err { color:#8a2a2a; font-size:13px; padding:12px 4px; }
   .spacer { flex:1; min-height:12px; }
-  .footer { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#6b7280; padding-top:8px; border-top:1px solid #263042; margin-top:auto; }
-  .footer a { color:#fbbf24; text-decoration:none; font-weight:600; cursor:pointer; }
+  .footer {
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:12px; color:var(--ink-soft);
+    padding-top:8px; border-top:1px solid var(--line); margin-top:auto;
+  }
+  .footer a { color:var(--gold); text-decoration:none; font-weight:bold; cursor:pointer; }
   .footer a:hover { text-decoration:underline; }
-  .row.high .name, .row.high .price { color:#4ade80; }
-  .row.low .name, .row.low .price { color:#6b7280; font-weight:500; }
+  .priceline { font-size:12px; color:var(--ink-soft); text-align:right; font-style:italic; }
+  .upd-banner {
+    text-align:center; font-size:13px; font-weight:bold; cursor:pointer;
+    color:#7a1f1f; background:linear-gradient(#f0d9b0, #e6c896);
+    border:1px solid var(--gold); border-radius:3px; padding:6px 10px;
+    box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+  .upd-banner:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Path of Expedition</h1>
   <div class="btns">
-    <label class="corelbl">Liga:
+    <label class="corelbl">League:
       <select id="league"></select>
     </label>
     <button id="sel">Select region</button>
     <button id="scan">Scan now</button>
     <button id="ref">Refresh prices</button>
+    <button id="chk">Check OCR</button>
+    <button id="upd">Update</button>
     <button id="dbg">Debug</button>
   </div>
-  <div id="status" class="status">Pornesc…</div>
-  <div id="list" class="list"><div class="empty">Niciun preț încă.</div></div>
+  <div id="updBanner" class="upd-banner" hidden></div>
+  <div id="status" class="status">Loading…</div>
+  <div id="list" class="list"><div class="empty">No prices yet.</div></div>
   <div class="spacer"></div>
+  <div id="pricesTime" class="priceline">Prices updated: —</div>
   <div class="footer">
     <span>made by iulian.icb</span>
     <a id="bmc">☕ Buy me a coffee</a>
@@ -58,12 +119,22 @@
 const statusEl = document.getElementById("status");
 const listEl = document.getElementById("list");
 const leagueEl = document.getElementById("league");
+const pricesTimeEl = document.getElementById("pricesTime");
+
+function setPricesTime(ts) {
+  if (!ts) { pricesTimeEl.textContent = "Prices updated: never"; return; }
+  const d = new Date(ts);
+  const pad = (n) => String(n).padStart(2, "0");
+  const date = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  pricesTimeEl.textContent = `Prices updated: ${date} ${time}`;
+}
 
 function render(rows, error) {
   if (error) { listEl.innerHTML = `<div class="err">${error}</div>`; return; }
-  if (!rows.length) { listEl.innerHTML = `<div class="empty">Niciun pret inca. Deschide Runeshape Combinations in joc.</div>`; return; }
+  if (!rows.length) { listEl.innerHTML = `<div class="empty">No items yet. Open Runeshape Combinations in game.</div>`; return; }
   listEl.innerHTML = rows.map(r => {
-    const price = r.display ? r.display.text : "?";   // deja cu moneda (ex / div / c)
+    const price = r.display ? r.display.text : "?";
     const name = r.matchedName || r.name;
     const tier = r.tier ? ` ${r.tier}` : "";
     return `<div class="row${tier}"><span class="name">${name}</span><span class="qty">${r.qty}x</span><span class="price">${price}</span></div>`;
@@ -71,9 +142,11 @@ function render(rows, error) {
 }
 
 leagueEl.onchange = async () => {
-  statusEl.textContent = "Schimb liga + încarc prețuri…";
+  statusEl.textContent = "Switching league + loading prices…";
   await window.api.setLeague(leagueEl.value);
-  statusEl.textContent = "Liga: " + leagueEl.value;
+  statusEl.textContent = "League: " + leagueEl.value;
+  const cfg = await window.api.getConfig();
+  setPricesTime(cfg.pricesAt);
   const r = await window.api.scanNow();
   render(r.rows, r.error);
 };
@@ -83,33 +156,98 @@ async function boot() {
   const leagues = cfg.availableLeagues || [];
   leagueEl.innerHTML = leagues.map(l => `<option value="${l}">${l}</option>`).join("");
   leagueEl.value = cfg.league || leagues[0] || "";
-  statusEl.textContent = cfg.region ? "Regiune setata. Scanez automat." : "Alege regiunea mai intai (Select region).";
+  setPricesTime(cfg.pricesAt);
+  statusEl.textContent = cfg.region ? "Region set. Scanning automatically." : "Choose a region first (Select region).";
+  checkUpdateNow(true); // fire-and-forget, silent
 }
+// re-verificam update la 30 min (un build pornit de mult timp prinde noul release)
+setInterval(() => checkUpdateNow(true), 30 * 60 * 1000);
 
 document.getElementById("sel").onclick = async () => {
-  statusEl.textContent = "Trage o box peste panoul Runeshape, apoi dă Enter.";
+  statusEl.textContent = "Drag a box over the Runeshape panel, then press Enter.";
   await window.api.selectRegion();
-  statusEl.textContent = "Regiune salvată. Scanez automat.";
+  statusEl.textContent = "Region saved. Scanning automatically.";
 };
 document.getElementById("scan").onclick = async () => {
-  statusEl.textContent = "Scanez…";
+  statusEl.textContent = "Scanning…";
   const r = await window.api.scanNow();
   render(r.rows, r.error);
-  statusEl.textContent = `Gata: ${r.rows.length} rânduri.`;
+  statusEl.textContent = `Done: ${r.rows.length} rows.`;
 };
 document.getElementById("ref").onclick = async () => {
-  statusEl.textContent = "Încarc prețuri…";
+  statusEl.textContent = "Loading prices…";
   const r = await window.api.refreshPrices();
-  statusEl.textContent = r.ok ? `Prețuri actualizate: ${r.count} itemuri.` : `Eroare: ${r.error}`;
+  if (r.at) setPricesTime(r.at);
+  statusEl.textContent = r.ok ? `Prices updated: ${r.count} items.` : `Error: ${r.error}`;
+};
+document.getElementById("chk").onclick = async () => {
+  statusEl.textContent = "Checking Windows OCR…";
+  const r = await window.api.checkOcr();
+  if (r.ok && r.engine) {
+    const langs = (r.langs && r.langs.length) ? r.langs.join(", ") : "profile languages";
+    statusEl.textContent = `OCR OK — engine ready (${langs}).`;
+  } else if (r.ok && !r.engine) {
+    statusEl.textContent = "OCR engine unavailable — install a Windows OCR language pack (Settings > Language).";
+  } else {
+    statusEl.textContent = "OCR check failed: " + (r.error || "unknown");
+  }
 };
 document.getElementById("bmc").onclick = () => {
   window.api.openExternal("https://buymeacoffee.com/iulian.icb");
+};
+
+// ---------- update (GitHub Releases) ----------
+let updateInfo = null; // { latest, current, releaseUrl, assets } cand e disponibil
+const updBanner = document.getElementById("updBanner");
+const updBtn = document.getElementById("upd");
+
+function pickAsset(assets) {
+  if (!assets || !assets.length) return null;
+  return assets.find(a => !/setup/i.test(a.name)) || assets[0];
+}
+
+async function checkUpdateNow(silent) {
+  try {
+    const r = await window.api.checkUpdate();
+    if (!r || !r.ok) { if (!silent) statusEl.textContent = "Update check failed."; return; }
+    if (r.updateAvailable) {
+      updateInfo = r;
+      updBanner.hidden = false;
+      updBanner.textContent = `⬆ Update available: v${r.latest} (you have v${r.current}) — click to open release`;
+      updBtn.textContent = "Update now";
+      if (!silent) statusEl.textContent = `Update available: v${r.latest}.`;
+    } else {
+      updateInfo = null;
+      updBanner.hidden = true;
+      updBtn.textContent = "Update";
+      if (!silent) statusEl.textContent = r.reason === "no-releases" ? "No releases published yet." : "Up to date.";
+    }
+  } catch (e) {
+    if (!silent) statusEl.textContent = "Update check failed.";
+  }
+}
+
+updBanner.onclick = () => {
+  if (updateInfo && updateInfo.releaseUrl) window.api.openExternal(updateInfo.releaseUrl);
+};
+
+updBtn.onclick = async () => {
+  if (!updateInfo) { await checkUpdateNow(false); return; } // recheck daca nu stim inca
+  const asset = pickAsset(updateInfo.assets);
+  if (!asset) { statusEl.textContent = "No downloadable .exe in the release."; return; }
+  statusEl.textContent = `Downloading ${asset.name}…`;
+  updBtn.disabled = true;
+  const r = await window.api.doUpdate(asset);
+  updBtn.disabled = false;
+  if (r.ok) statusEl.textContent = `Update launched: ${asset.name}. Close this version.`;
+  else statusEl.textContent = "Update failed: " + r.error;
 };
 document.getElementById("dbg").onclick = () => {
   window.api.openDebug();
 };
 
 window.api.onScan((data) => {
+  if (data.pricesAt) setPricesTime(data.pricesAt);
   render(data.rows, data.error);
 });
 
