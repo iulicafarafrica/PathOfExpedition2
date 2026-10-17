@@ -26,12 +26,15 @@ Your region and league are saved, so the next time you launch it just picks up w
 | Windows OCR | Reads the panel text using the OCR built into Windows itself — no cloud, no extra engine, no model downloads. See [How the OCR works](#how-the-ocr-works). |
 | Smart name matching | OCR isn't perfect, so matching is layered: exact → digit fixes (`0→o`, `1→l`, …) → prefix → fuzzy edit-distance. It also fixes possessives ("Jeweller s" → "Jewellers") and refuses to guess levels on uncut gems. |
 | Live poe.ninja prices | Pulls the exchange overview for Currency, Runes, Expedition, Verisium and UncutGems, normalizes everything to "per 1 Divine", and converts it to the league's primary currency correctly (exalted on HC, divine on softcore). |
+| Item page link | Click a row and its poe.ninja item page opens in your browser (volume, price history) — same league as selected. |
 | Auto currency | Cheap items show in exalted, expensive ones in divine — same rounding rules as the poe.ninja site, so numbers match what you'd see there. |
 | Stack totals | Prices are shown for the whole stack (`5x` = 5 × unit), with the unit price in parentheses when qty > 1. |
+| Price trend | A little ▲ (green) / ▼ (red) arrow next to the name shows whether the item went up or down over the last 7 days (poe.ninja data), so you know if now's the time to sell. |
 | Value tiers | The most valuable drop glows green, the least is dimmed. Easy to spot what mattered. |
 | League switch | Change league in-app; prices reload and the current panel is re-priced immediately. |
 | Auto-scan | Scans every 3 s once a region is set. No start/stop button to forget. |
 | Price auto-refresh | Prices reload every 30 minutes (poe.ninja caches ~5 min anyway); **Refresh prices** forces it on demand. |
+| Offline cache | If poe.ninja or your network is down, the app keeps working off the last price snapshot (marked "cached — offline") and recovers automatically as soon as the site answers again. |
 | Chat/noise filter | Chat lines and panel noise that isn't a priced item and has no explicit `Nx` quantity get dropped, so the list stays clean. |
 | Update check | Checks GitHub Releases on launch and every 30 min. When a newer release is out, a banner appears and **Update now** downloads and launches it. |
 | Check OCR | Verifies that the Windows OCR engine is present and which languages are installed. Useful when the text looks garbled. |
