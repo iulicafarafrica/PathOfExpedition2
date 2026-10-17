@@ -93,6 +93,8 @@ The executables land in `dist/`. `package-lock.json` pins the dependencies, so a
 
 **VirusTotal scan of the current build:** <https://www.virustotal.com/gui/file-analysis/ZDUxNWFlNzU4Yjk5MjA0ZDBhYmUwMDJiZmEzYThlM2Q6MTc5MjI1NzEzNg==>. (New releases get a new hash — feel free to re-scan before running.)
 
+**"Wait, my antivirus flagged it?"** — that happens, and it's worth understanding. A single engine (so far: McAfee) reports a detection like `Ti!89ED4493BBF4`. That name is **not a known virus** — it's the first 12 characters of the file's own SHA-256, which is how McAfee labels its *generic behavioral* (heuristic) detections, as opposed to a signature for real malware (which would carry a family name like `W32.Sality` or `Trojan:Win32/...`). What feeds the heuristic in this case: the exe is **unsigned** (no code-signing certificate yet), the portable build is a self-extracting archive with a bundled Electron runtime, and the app spawns a local PowerShell process for Windows OCR and captures a screen region — exactly the behaviors those engines like to watch. The tells that it's a false positive: 1-2 of ~70 engines flagging it, the code above is the entire app (read it or build it yourself), and it talks to no network endpoint beyond the ones listed. If your AV or a new VirusTotal scan shows something different from that pattern, please open an issue — and consider holding off on running the file until it's looked at. I'm working toward code-signing the releases, which removes most of these flags at the source.
+
 ## Troubleshooting
 
 - **Garbled text / nothing matches** → wrong or missing OCR language (see above). The Debug window shows exactly what OCR read.
