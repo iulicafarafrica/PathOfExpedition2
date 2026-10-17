@@ -1,5 +1,7 @@
 # Path of Expedition
 
+![Path of Expedition](ss1.png)
+
 A small Windows desktop app for Path of Exile 2. It reads the Runeshape / Expedition reward panel from your screen and tells you what those drops are actually worth, using live prices from poe.ninja.
 
 I made it because I was tired of mentally converting "2x Greater Orb of Transmutation" into exalted every time a run closed out.
