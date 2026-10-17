@@ -10,7 +10,7 @@ I made it because I was tired of mentally converting "2x Greater Orb of Transmut
 
 ## Quick start
 
-1. Grab the latest `.exe` from [Releases](https://github.com/iulicafarafrica/PathOfExpedition2/releases) (the portable one is enough, no install needed). If you'd like, run it through [VirusTotal](https://www.virustotal.com/gui/file-analysis/ZDUxNWFlNzU4Yjk5MjA0ZDBhYmUwMDJiZmEzYThlM2Q6MTc5MjI1NzEzNg==) first — this is the current build, and the project is fully open source so you can also just read the code or build it yourself (see [Open source & security](#open-source--security)).
+1. Grab the latest `.exe` from [Releases](https://github.com/iulicafarafrica/PathOfExpedition2/releases) (the portable one is enough, no install needed). If you'd like, run it through [VirusTotal](https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==) first — this is the current build, and the project is fully open source so you can also just read the code or build it yourself (see [Open source & security](#open-source--security)).
 2. Run it and pick your **league** from the dropdown.
 3. In-game, open the **Runeshape Combinations** panel.
 4. Click **Select region**, drag the green box over the reward panel and resize it to cover the list, then press **Enter**.
@@ -91,7 +91,7 @@ npm run dist
 
 The executables land in `dist/`. `package-lock.json` pins the dependencies, so a fresh clone builds the same thing.
 
-**VirusTotal scan of the current build:** <https://www.virustotal.com/gui/file-analysis/ZDUxNWFlNzU4Yjk5MjA0ZDBhYmUwMDJiZmEzYThlM2Q6MTc5MjI1NzEzNg==>. (New releases get a new hash — feel free to re-scan before running.)
+**VirusTotal scan of the current build:** <https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==>. (New releases get a new hash — feel free to re-scan before running.)
 
 **"Wait, my antivirus flagged it?"** — that happens, and it's worth understanding. A single engine (so far: McAfee) reports a detection like `Ti!89ED4493BBF4`. That name is **not a known virus** — it's the first 12 characters of the file's own SHA-256, which is how McAfee labels its *generic behavioral* (heuristic) detections, as opposed to a signature for real malware (which would carry a family name like `W32.Sality` or `Trojan:Win32/...`). What feeds the heuristic in this case: the exe is **unsigned** (no code-signing certificate yet), the portable build is a self-extracting archive with a bundled Electron runtime, and the app spawns a local PowerShell process for Windows OCR and captures a screen region — exactly the behaviors those engines like to watch. The tells that it's a false positive: 1-2 of ~70 engines flagging it, the code above is the entire app (read it or build it yourself), and it talks to no network endpoint beyond the ones listed. If your AV or a new VirusTotal scan shows something different from that pattern, please open an issue — and consider holding off on running the file until it's looked at. I'm working toward code-signing the releases, which removes most of these flags at the source.
 
