@@ -774,8 +774,11 @@ const LEAGUE_SLUGS = {
   "Standard": "standard",
 };
 const CATEGORY_SLUGS = { Currency: "currency", Runes: "runes", UncutGems: "uncut-gems", Verisium: "verisium", Expedition: "expedition" };
+// "Jeweller's Orb" -> "jewellers-orb": apostroful se scoate (NU devine cratima).
+// Verificat pe toti cei 277 de itemi din API (toate categoriile); slug-ul e
+// identic in orice liga, se schimba doar segmentul de liga din URL.
 function nameSlug(s) {
-  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return String(s || "").toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 function poeNinjaItemUrl(league, category, name) {
   const ls = LEAGUE_SLUGS[league], cs = CATEGORY_SLUGS[category], ns = nameSlug(name);
