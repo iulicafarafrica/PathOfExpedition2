@@ -10,7 +10,11 @@ A small Windows desktop app for Path of Exile 2. It reads the Expedition reward 
 
 ## Quick start
 
-1. Grab the latest `.exe` from [Releases](https://github.com/iulicafarafrica/PathOfExpedition2/releases) (the portable one is enough, no install needed). If you'd like, run it through [VirusTotal](https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==) first — this is the current build, and the project is fully open source so you can also just read the code or build it yourself (see [Open source & security](#open-source--security)).
+1. Grab the latest version from [Releases](https://github.com/iulicafarafrica/PathOfExpedition2/releases). There are two files, same app, different delivery:
+   - **`Path of Expedition <version>.exe`** — portable: no install, run it from anywhere (desktop, USB stick) and delete it whenever.
+   - **`Path of Expedition Setup <version>.exe`** — classic Windows installer: puts it in your Programs folder, creates a Start-menu entry, and can be uninstalled normally.
+
+   If you'd like, run it through [VirusTotal](https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==) first — this is the current build, and the project is fully open source so you can also just read the code or build it yourself (see [Open source & security](#open-source--security)).
 2. Run it and pick your **league** from the dropdown.
 3. In-game, open the **Runeshape Combinations** panel.
 4. Click **Select region**, drag the green box over the reward panel and resize it to cover the list, then press **Enter**.
