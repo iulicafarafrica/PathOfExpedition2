@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld("api", {
   getConfig: () => ipcRenderer.invoke("get-config"),
   setLeague: (league) => ipcRenderer.invoke("set-league", league),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
+  openItem: (row) => ipcRenderer.invoke("open-item", row),
   openDebug: () => ipcRenderer.invoke("open-debug"),
   getDebug: () => ipcRenderer.invoke("get-debug"),
   checkOcr: () => ipcRenderer.invoke("check-ocr"),

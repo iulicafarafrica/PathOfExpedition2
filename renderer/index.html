@@ -64,6 +64,8 @@
     display:flex; align-items:baseline; gap:8px; padding:7px 4px;
     border-bottom:1px solid rgba(138,111,71,.35);
   }
+  .row.clickable { cursor:pointer; }
+  .row.clickable:hover { background:rgba(138,111,71,.14); }
   .row:last-child { border-bottom:0; }
   .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; color:var(--ink); }
   .trend { flex-shrink:0; font-size:11px; }
@@ -124,13 +126,14 @@ const listEl = document.getElementById("list");
 const leagueEl = document.getElementById("league");
 const pricesTimeEl = document.getElementById("pricesTime");
 
-function setPricesTime(ts) {
-  if (!ts) { pricesTimeEl.textContent = "Prices updated: never"; return; }
+function setPricesTime(ts, stale) {
+  const suffix = stale ? " (cached — offline)" : "";
+  if (!ts) { pricesTimeEl.textContent = "Prices updated: never" + suffix; return; }
   const d = new Date(ts);
   const pad = (n) => String(n).padStart(2, "0");
   const date = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  pricesTimeEl.textContent = `Prices updated: ${date} ${time}`;
+  pricesTimeEl.textContent = `Prices updated: ${date} ${time}${suffix}`;
 }
 
 function esc(s) {
@@ -140,13 +143,21 @@ function esc(s) {
 function render(rows, error) {
   if (error) { listEl.innerHTML = `<div class="err">${esc(error)}</div>`; return; }
   if (!rows.length) { listEl.innerHTML = `<div class="empty">No items yet. Open Runeshape Combinations in game.</div>`; return; }
-  listEl.innerHTML = rows.map(r => {
+  listEl.innerHTML = rows.map((r, i) => {
     const price = r.display ? esc(r.display.text) : "?";
     const name = esc(r.matchedName || r.name);
     const tier = r.tier ? ` ${r.tier}` : "";
+    const clickable = r.matchedName ? " clickable" : "";
     const trend = r.trend === "up" ? '<span class="trend up">▲</span>' : r.trend === "down" ? '<span class="trend down">▼</span>' : "";
-    return `<div class="row${tier}"><span class="name">${name}</span>${trend}<span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
+    return `<div class="row${tier}${clickable}" data-i="${i}"><span class="name">${name}</span>${trend}<span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
   }).join("");
+  // click pe un rand cu preț -> pagina itemului pe poe.ninja (volum, istoric)
+  listEl.querySelectorAll(".row.clickable").forEach((el) => {
+    el.addEventListener("click", () => {
+      const r = rows[+el.dataset.i];
+      if (r && r.matchedName) window.api.openItem({ league: leagueEl.value, category: r.category, name: r.matchedName });
+    });
+  });
 }
 
 leagueEl.onchange = async () => {
@@ -154,7 +165,7 @@ leagueEl.onchange = async () => {
   await window.api.setLeague(leagueEl.value);
   statusEl.textContent = "League: " + leagueEl.value;
   const cfg = await window.api.getConfig();
-  setPricesTime(cfg.pricesAt);
+  setPricesTime(cfg.pricesAt, cfg.pricesStale);
   const r = await window.api.scanNow();
   render(r.rows, r.error);
 };
@@ -164,7 +175,7 @@ async function boot() {
   const leagues = cfg.availableLeagues || [];
   leagueEl.innerHTML = leagues.map(l => `<option value="${l}">${l}</option>`).join("");
   leagueEl.value = cfg.league || leagues[0] || "";
-  setPricesTime(cfg.pricesAt);
+  setPricesTime(cfg.pricesAt, cfg.pricesStale);
   statusEl.textContent = cfg.region ? "Region set. Scanning automatically." : "Choose a region first (Select region).";
   checkUpdateNow(true); // fire-and-forget, silent
 }
@@ -185,8 +196,10 @@ document.getElementById("scan").onclick = async () => {
 document.getElementById("ref").onclick = async () => {
   statusEl.textContent = "Loading prices…";
   const r = await window.api.refreshPrices();
-  if (r.at) setPricesTime(r.at);
-  statusEl.textContent = r.ok ? `Prices updated: ${r.count} items.` : `Error: ${r.error}`;
+  if (r.at) setPricesTime(r.at, r.stale);
+  statusEl.textContent = r.ok
+    ? (r.stale ? `poe.ninja unreachable — showing cached prices (${r.count} items).` : `Prices updated: ${r.count} items.`)
+    : `Error: ${r.error}`;
 };
 document.getElementById("chk").onclick = async () => {
   statusEl.textContent = "Checking Windows OCR…";
@@ -248,7 +261,7 @@ document.getElementById("dbg").onclick = () => {
 };
 
 window.api.onScan((data) => {
-  if (data.pricesAt) setPricesTime(data.pricesAt);
+  if (data.pricesAt) setPricesTime(data.pricesAt, data.pricesStale);
   render(data.rows, data.error);
 });
 

@@ -305,7 +305,31 @@ const NINJA_TYPES = ["Currency", "Runes", "Expedition", "Verisium", "UncutGems"]
 // (poe.ninja n-are date de exchange pentru el).
 const AVAILABLE_LEAGUES = ["Forbidden Rites", "HC Forbidden Rites", "Runes of Aldur", "HC Runes of Aldur", "Standard"];
 let priceCache = { map: {}, fetchedAt: 0 };   // map: nameLower -> {price, id, name}; price = in Divine
+let pricesStale = false;                      // true = afisam prețuri din snapshot local (offline)
 const PRICE_TTL = 5 * 60 * 1000;               // 5 min (respectam cache-ul lor ~5 min)
+// ---------- offline cache: ultimul snapshot de prețuri pe disk ----------
+function pricesCachePath() {
+  return path.join(app.getPath("userData"), "prices-cache.json");
+}
+function savePricesSnapshot() {
+  try {
+    if (!priceCache.map || !Object.keys(priceCache.map).length) return;
+    fs.writeFileSync(pricesCachePath(), JSON.stringify({ league: config.league, fetchedAt: priceCache.fetchedAt, map: priceCache.map }));
+  } catch (e) { log("savePricesSnapshot:", e.message); }
+}
+function loadPricesSnapshot(league) {
+  try {
+    const j = JSON.parse(fs.readFileSync(pricesCachePath(), "utf8"));
+    if (!j || j.league !== league || !j.map || !Object.keys(j.map).length) return false;
+    const map = j.map;
+    const keysByLength = {};
+    for (const k of Object.keys(map)) (keysByLength[k.length] = keysByLength[k.length] || []).push(k);
+    priceCache = { map, keysByLength, fetchedAt: j.fetchedAt || 0 };
+    pricesStale = true;
+    log("prețuri din cache local (offline):", Object.keys(map).length, "itemuri");
+    return true;
+  } catch { return false; }
+}
 // rate-uri: cate unitati de moneda core per 1 Divine (calculate din core.rates al API-ului)
 let xchgRates = { chaos: null, exalted: null };
 
@@ -384,7 +408,13 @@ async function fetchPrices(league) {
   for (const k of Object.keys(map)) {
     (keysByLength[k.length] = keysByLength[k.length] || []).push(k);
   }
+  if (Object.keys(map).length === 0) {
+    // poe.ninja / retea indisponibila: recadere la ultimul snapshot local (aceeasi liga)
+    if (loadPricesSnapshot(league)) return priceCache.map;
+  }
+  pricesStale = false;
   priceCache = { map, keysByLength, fetchedAt: Date.now() };
+  savePricesSnapshot();
   log("fetchPrices: GATA total", Object.keys(map).length, "itemuri");
   return map;
 }
@@ -655,6 +685,7 @@ async function doScan() {
       const qty = r.qty || 1;
         r.price = p ? p.price : null;            // pret UNITAR in Divine (raw)
         r.matchedName = p ? p.name : null;
+        r.category = p ? p.category : null;      // pt linkul catre pagina itemului pe poe.ninja
         r.trend = p ? p.trend : null;            // "up" | "down" | "flat" | null
       r.totalDivine = p ? p.price * qty : null;  // TOTALUL stack-ului in Divine (pt tier)
       // Pretul afisat = TOTALUL stack-ului; pentru qty>1 aratam si unitar.
@@ -678,7 +709,7 @@ async function doScan() {
     }
     rows.length = 0; rows.push(...kept);
     lastRows = rows;
-    return { rows, at: Date.now(), pricesAt: priceCache.fetchedAt };
+    return { rows, at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale };
   } catch (e) {
     return { rows: [], error: String(e) };
   }
@@ -699,7 +730,7 @@ function stopPoll() {
 }
 
 // ---------- IPC ----------
-ipcMain.handle("get-config", () => ({ ...config, availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt }));
+ipcMain.handle("get-config", () => ({ ...config, availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale }));
 // health-check Windows OCR (butonul "Check OCR")
 ipcMain.handle("check-ocr", () => checkOcrHealth());
 // update: verificare ultimul release GitHub + descarcare/lanare
@@ -722,13 +753,44 @@ ipcMain.handle("do-update", async () => {
   }
 });
 // deschide un link extern in browserul implicit; doar URL-uri allowlist-uite
-// (buymeacoffee + release page), ca un renderer compromis sa nu poata deschide orice.
+// (buymeacoffee + release page + pagini de item poe.ninja), ca un renderer
+// compromis sa nu poata deschide orice.
 const EXTERNAL_ALLOW = [
   /^https:\/\/buymeacoffee\.com\/iulian\.icb\/?$/i,
   /^https:\/\/github\.com\/iulicafarafrica\/PathOfExpedition2(\/|$)/i,
+  /^https:\/\/poe\.ninja\/poe2\/economy\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/?$/i,
 ];
 ipcMain.handle("open-external", (_e, url) => {
   if (typeof url === "string" && EXTERNAL_ALLOW.some((re) => re.test(url))) shell.openExternal(url);
+});
+
+// pagina itemului pe poe.ninja (volum, istoric de preț):
+// /poe2/economy/{league}/{category}/{name-slug} — structura verificata din sitemap-ul lor.
+const LEAGUE_SLUGS = {
+  "Forbidden Rites": "forbiddenrites",
+  "HC Forbidden Rites": "forbiddenriteshc",
+  "Runes of Aldur": "runesofaldur",
+  "HC Runes of Aldur": "runesofaldurhc",
+  "Standard": "standard",
+};
+const CATEGORY_SLUGS = { Currency: "currency", Runes: "runes", UncutGems: "uncut-gems", Verisium: "verisium", Expedition: "expedition" };
+function nameSlug(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+function poeNinjaItemUrl(league, category, name) {
+  const ls = LEAGUE_SLUGS[league], cs = CATEGORY_SLUGS[category], ns = nameSlug(name);
+  if (!ls || !cs || !ns) return null;
+  return `https://poe.ninja/poe2/economy/${ls}/${cs}/${ns}`;
+}
+// click pe un rand -> pagina itemului; URL-ul e construit in main din componente
+// validate (rendererul nu poate injecta un URL arbitrar).
+ipcMain.handle("open-item", (_e, r) => {
+  const league = r && AVAILABLE_LEAGUES.includes(r.league) ? r.league : config.league;
+  const category = r && NINJA_TYPES.includes(r.category) ? r.category : null;
+  const name = r && typeof r.name === "string" && nameSlug(r.name) ? r.name : null;
+  const url = category && name ? poeNinjaItemUrl(league, category, name) : null;
+  if (url && EXTERNAL_ALLOW.some((re) => re.test(url))) shell.openExternal(url);
+  return url;
 });
 // buffer de debug: loguri + liniile OCR brute din ultimul scan
 ipcMain.handle("get-debug", () => ({
@@ -765,7 +827,7 @@ ipcMain.handle("set-league", async (_e, league) => {
 ipcMain.handle("refresh-prices", async () => {
   try {
     const map = await fetchPrices(config.league || "Forbidden Rites");
-    return { ok: true, count: Object.keys(map).length, at: priceCache.fetchedAt };
+    return { ok: true, count: Object.keys(map).length, at: priceCache.fetchedAt, stale: pricesStale };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
@@ -834,6 +896,12 @@ app.whenReady().then(async () => {
       log("auto-refresh: preturi actualizate", Object.keys(priceCache.map).length);
     } catch (e) { log("auto-refresh: eroare", e.message || e); }
   }, 30 * 60 * 1000);
+  // daca ramanem pe prețuri "stale" (offline), reîncercam la 5 min
+  setInterval(async () => {
+    if (!pricesStale) return;
+    try { await fetchPrices(config.league || "Forbidden Rites"); }
+    catch (e) { log("retry prețuri:", e.message || e); }
+  }, 5 * 60 * 1000);
 });
 app.on("window-all-closed", () => app.quit());
 
