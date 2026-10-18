@@ -1,8 +1,14 @@
 # Path of Expedition
 
-![Path of Expedition](screenshot-window.png)
+![In-game overlay](screenshot-overlay.jpeg)
+
+*The in-game overlay: live poe.ninja prices drawn straight over your Runeshape panel.*
 
 A small Windows desktop app for Path of Exile 2. It reads the Expedition reward panel from your screen and tells you what those drops are actually worth, using live prices from poe.ninja — right over the game, in a click-through in-game overlay, or in a compact window.
+
+![The app window](screenshot-window.png)
+
+*Prefer a normal window? The same price list, with icons, value tiers and the running total.*
 
 **This project is not affiliated with, endorsed by, or sponsored by Grinding Gear Games.** "Path of Exile", "Path of Exile 2", and related marks belong to Grinding Gear Games. This tool is a fan-made convenience; GGG's ToS apply to everything you do in-game. It is also not affiliated with poe.ninja — the app just uses their public exchange API for prices, same as their own website does.
 
@@ -53,8 +59,6 @@ Your region and league are saved, so the next time you launch it just picks up w
 | Buy me a coffee | If it saves you money or sanity, a coffee is appreciated: https://buymeacoffee.com/iulian.icb |
 
 ## In-game overlay
-
-![Prices drawn over the Runeshape panel](screenshot-overlay.jpeg)
 
 Turn the overlay **on** and the prices are drawn straight over the game, lined up with each row of the reward panel — no alt-tabbing, no second monitor needed. It is a transparent, **click-through** window: the game keeps all of your mouse input and the overlay adds no input lag. Each bar is only as wide as its text, so it covers as little of the game as possible, and the background is nearly opaque so it stays readable over any scene.
 
