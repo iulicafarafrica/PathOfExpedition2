@@ -1,37 +1,39 @@
-# PoE Ninja API - Note
+# PoE Ninja API — Notes
 
-## Ce e suportat (public)
-Doar endpoint-urile de **economy overview** (POE1 + POE2). Niciun secret — le citești din tab-ul Network (F12).
+## What is supported (public)
+Only the **economy overview** endpoints (PoE1 + PoE2). No secrets — you can read them from the Network tab (F12).
 
-## Ce NU e permis
-- Builds/profiles API (character, PoB, auth) — intern, nu e pentru third-party.
-- Poate schimba/strica oricând.
-- Clients care abuzează de economy endpoints → **block**.
+## What is NOT allowed
+- Builds/profiles API (character, PoB, auth) — internal, not meant for third parties.
+- It can change or break at any time.
+- Clients that abuse the economy endpoints get **blocked**.
 
-## Fără garanție de stabilitate
-- API-ul există pentru site, nu e un produs. "Supported public surface" = ai voie să-l folosești, NU e stabil.
-- Fără versioning, fără SLA. Breaking changes pot apărea fără notificare (best-effort).
+## No stability guarantee
+- The API exists for the website; it is not a product. "Supported public surface" means you are allowed to use it, NOT that it is stable.
+- No versioning, no SLA. Breaking changes can appear without notice (best-effort).
 
-## Ghid pentru app-uri
-- **Desktop apps trebuie să proxieze request-urile prin un propriu backend** (nu direct de pe mașina user-ului). Asta permite: cache, User-Agent corect, control volum.
-- Responses sunt HTTP-cached (~5 min, ETag). Folosește conditional requests, respectă cache headers, NU bypassa cache.
-- Datele se actualizează rar: POE1 ~15 min, **POE2 ~oră**. Polling mai des de câteva minute = bandwidth irosit.
-- Trimite un **User-Agent descriptiv** (identifică app-ul + contact).
-- Fii rezonabil cu concurența și volumul.
-- Nu replica site-ul. Construiește ceva nou.
+## Guidance for apps
+- Desktop apps should proxy requests through their own backend (not directly from the user's machine). That allows: caching, a proper User-Agent, and volume control.
+- Responses are HTTP-cached (~5 min, ETag). Use conditional requests, respect the cache headers, do NOT bypass the cache.
+- Data updates slowly: PoE1 ~15 min, **PoE2 ~1 hour**. Polling more often than every few minutes is wasted bandwidth.
+- Send a **descriptive User-Agent** (identify the app + a contact).
+- Be reasonable with concurrency and volume.
+- Don't replicate the site. Build something new.
 
 ## Endpoints
 
 ### Economy leagues
-- POE1: `GET /poe1/api/economy/leagues`
-- POE2: `GET /poe2/api/economy/leagues`
-- Return: array de `{id, name}`. Primul = current temporary challenge league (folosește `id` ca parametru `league`).
+- PoE1: `GET /poe1/api/economy/leagues`
+- PoE2: `GET /poe2/api/economy/leagues`
+- Returns an array of `{id, name}`. The first entry is the current temporary challenge league (use `id` as the `league` parameter).
+- (We do not call this endpoint — see [Our implementation](#our-implementation).)
 
-### Exchange overview (currencies - CEL FOLOSIT DE NOI)
-- POE2: `GET /poe2/api/economy/exchange/current/overview?league={league}&type={type}`
+### Exchange overview (currencies — THE ONE WE USE)
+- PoE2: `GET /poe2/api/economy/exchange/current/overview?league={league}&type={type}`
 
-**type valorile POE2:**
-| Valoare | Categorie |
+**PoE2 `type` values:**
+
+| Value | Category |
 |---------|-----------|
 | Currency | Currency |
 | Fragments | Fragments |
@@ -50,37 +52,49 @@ Doar endpoint-urile de **economy overview** (POE1 + POE2). Niciun secret — le 
 
 **Response:**
 - `lines[]`: `{id, primaryValue, volumePrimaryValue, maxVolumeCurrency, maxVolumeRate, sparkline}`
-  - `primaryValue` = prețul în primary reference currency (Divine de obicei)
+  - `primaryValue` = price in the primary reference currency (usually Divine)
+  - `sparkline` = `{totalChange, data[]}` (7 days)
 - `core`: `{primary, secondary, rates, items[]}`
-  - `items[]`: `{id, name, category, image, detailsId}` (metadate, nume)
-- `items[]` (top-level): metadata per item
-- `lines[]` + `items[]` se leagă prin `id`
+  - `primary` / `secondary` = reference currencies; `rates` = exchange rates relative to the primary one
+- `items[]` (top-level): per-item metadata `{id, name, category, image, detailsId}`
+- `lines[]` and `items[]` are joined by `id`
 
 ### Stash item overview (uniques, gems, etc.)
-- POE2: `GET /poe2/api/economy/stash/current/item/overview?league={league}&type={type}`
+- PoE2: `GET /poe2/api/economy/stash/current/item/overview?league={league}&type={type}`
 
-**type POE2:** UniqueWeapons, UniqueArmours, UniqueAccessories, UniqueFlasks, UniqueCharms, UniqueJewels, UniqueSanctumRelics, UniqueTablets, PrecursorTablets
+**PoE2 `type` values:** UniqueWeapons, UniqueArmours, UniqueAccessories, UniqueFlasks, UniqueCharms, UniqueJewels, UniqueSanctumRelics, UniqueTablets, PrecursorTablets
 
 **Response `lines[]`:** `{id, itemId, detailsId, name, baseType, category, primaryValue, listingCount, corrupted, levelRequired, ...}`
-- `primaryValue` = valoare în primary reference currency
-- `name` = numele itemului
+- `primaryValue` = value in the primary reference currency
+- `name` = item name
 
-### Stash currency overview (DOAR POE1)
-- POE2 currency e servit prin **exchange overview** (nu prin stash)
+### Stash currency overview (PoE1 ONLY)
+- PoE2 currency is served through the **exchange overview** (not through stash)
 
-## Implementarea noastră
-- Endpoint principal: `GET /poe2/api/economy/exchange/current/overview?league=...&type=Currency`
-- Fetchăm mai multe `type` (Currency, Fragments, UncutGems, Essences, SoulCores, Idols, Runes, Verisium, Expedition)
-- Facem un map: `name(lower) -> {price, id}`, unde `price` e normalizat in Divine
-  (`primaryValue * divinePerPrimary`, ca sa mearga si pe ligi cu `core.primary = "exalted"`)
-- La scan, OCR-ul dă nume (ex "Greater Orb of Augmentation"), le căutăm în map
-- Afișăm prețul cu logica **autoCurrency** (identică cu afișarea de pe site-ul poe.ninja):
-  - pret ~>= 1 Divine -> in **Divine**
-  - pret < 1 Divine -> in **Exalted** (moneda core; fallback Chaos)
-  - modul manual (Div / Exalted / Chaos) ramane disponibil din dropdown
+## Our implementation
+- Base URL: `https://poe.ninja/poe2/api/economy`
+- Main endpoint: `GET /poe2/api/economy/exchange/current/overview?league={league}&type={type}`
+- Categories we fetch (`NINJA_TYPES`): **Currency, Runes, Expedition, Verisium, UncutGems** (5 categories).
+- We do **not** call the `/leagues` endpoint. Leagues are a **hardcoded** list:
+  `Forbidden Rites`, `HC Forbidden Rites`, `Runes of Aldur`, `HC Runes of Aldur`, `Standard`.
+  The selected league name is sent verbatim as the `league` parameter.
+- We build a map `name(lowercased) -> {price, id, name}`, where `price` is normalized to Divine:
+  `primaryValue * divinePerPrimary`, with `divinePerPrimary = 1` when `core.primary === "divine"`,
+  otherwise `core.rates.divine`. This makes it work on leagues whose primary currency is Exalted (Hardcore).
+- Exchange rates are normalized to "per 1 Divine": `exalted per div = exPerPrimary / divPerPrimary`,
+  `chaos per div = chaosPerPrimary / divPerPrimary`.
+- At scan time, OCR produces names (e.g. "Greater Orb of Augmentation") which are looked up in the map
+  using layered matching (exact → digit fixes → prefix → fuzzy edit-distance).
+- Prices are displayed with the **autoCurrency** logic (identical to how the poe.ninja website shows them):
+  - price ~>= 1 Divine → shown in **Divine**
+  - price < 1 Divine → shown in the **core** currency (Exalted, fallback Chaos)
+  - there is **no manual currency dropdown** in the app — display is always `"auto"`.
+- When poe.ninja or the network is unavailable, we fall back to the last saved snapshot
+  (`prices-cache.json`) and mark the prices as "cached — offline".
 
-## Reguli de good-citizen
-- User-Agent: `ExpeditionPriceChecker/1.0 (contact: ...)`
-- Cache responses local ~5-10 min (ETag)
-- Nu polling mai des de 5 min
-- Limita concurența
+## Our good-citizen rules
+- User-Agent: `PathOfExpedition/1.0 (desktop app; contact: local)`
+- We rely on poe.ninja's own HTTP cache (~5 min, ETag) and do not bypass it.
+- Prices refresh automatically every **30 min** (and retry every **5 min** while offline).
+- Scanning (OCR only) runs every **3 s** and does not hit the API.
+- Request volume is kept minimal: 5 category requests per refresh.
