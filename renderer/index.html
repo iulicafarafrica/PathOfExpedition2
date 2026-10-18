@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:"
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://web.poecdn.com"
 />
 <title>Path of Expedition</title>
 <style>
@@ -36,61 +36,67 @@
     background:
       radial-gradient(ellipse at 50% 0%, #e7d9b6 0%, #cbb890 60%, #b49b6e 100%);
   }
-  .wrap { padding:16px 18px; display:flex; flex-direction:column; gap:12px; min-height:100%; }
+  .wrap { padding:10px 12px; display:flex; flex-direction:column; gap:7px; min-height:100%; }
   h1 {
     font-family: "Norse", Georgia, serif;
-    font-size:30px; margin:0 0 2px; text-align:center; letter-spacing:1px;
+    font-size:21px; margin:0; text-align:center; letter-spacing:.5px;
     color:var(--ink); text-shadow:0 1px 0 rgba(255,255,255,.35);
   }
-  .btns { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; }
-  .corelbl { display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:bold; }
+  .btns { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .corelbl { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:bold; }
   button, select {
-    font-family:inherit; font-size:13px; font-weight:bold; color:var(--ink);
+    font-family:inherit; font-size:12px; font-weight:bold; color:var(--ink);
     background:linear-gradient(#d8c89e, var(--btn));
     border:1px solid var(--line); border-radius:3px;
-    padding:6px 12px; cursor:pointer;
+    padding:4px 8px; cursor:pointer;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 1px 2px rgba(0,0,0,.25);
   }
   button:hover, select:hover { background:linear-gradient(#e2d4ae, var(--btn-hi)); }
   button:active { box-shadow:inset 0 1px 3px rgba(0,0,0,.35); }
-  .status { font-size:13px; color:var(--ink-soft); text-align:center; min-height:16px; font-style:italic; }
+  button.on { background:linear-gradient(#b7d9a0, #9cc47e); }
+  .status { font-size:12px; color:var(--ink-soft); text-align:center; min-height:14px; font-style:italic; }
   .list {
     background:linear-gradient(#e0d1ad, #d3c19a);
     border:2px solid var(--line); border-radius:4px;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.25);
-    padding:6px 10px; min-height:140px;
+    padding:3px 8px; min-height:70px; overflow:auto;
   }
   .row {
-    display:flex; align-items:baseline; gap:8px; padding:7px 4px;
+    display:flex; align-items:center; gap:6px; padding:3px 3px;
     border-bottom:1px solid rgba(138,111,71,.35);
   }
   .row.clickable { cursor:pointer; }
   .row.clickable:hover { background:rgba(138,111,71,.14); }
   .row:last-child { border-bottom:0; }
-  .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; color:var(--ink); }
-  .trend { flex-shrink:0; font-size:11px; }
+  .ico { flex-shrink:0; width:18px; height:18px; }
+  .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:var(--ink); }
+  /* coloane cu latime FIXA ca randurile sa fie aliniate pe verticala */
+  .spark { flex-shrink:0; width:46px; display:flex; justify-content:flex-end; }
+  .trend { flex-shrink:0; width:52px; text-align:right; font-size:10px; }
   .trend.up { color:var(--green); }
   .trend.down { color:#8a2a2a; }
-  .qty { flex-shrink:0; padding:0 10px; font-weight:bold; color:var(--ink-soft); font-size:14px; }
-  .price { flex-shrink:0; min-width:150px; text-align:right; white-space:nowrap; font-weight:bold; font-size:15px; color:var(--gold); }
+  /* market mover: crestere mare pe 7 zile -> evidentiat, bun de vandut */
+  .trend.pump { color:#b25e00; font-weight:bold; }
+  .qty { flex-shrink:0; width:30px; text-align:right; font-weight:bold; color:var(--ink-soft); font-size:12px; }
+  .price { flex-shrink:0; width:150px; text-align:right; white-space:nowrap; font-weight:bold; font-size:13px; color:var(--gold); }
+  /* niveluri de valoare (praguri fixe in Divine) */
   .row.high .name, .row.high .price { color:var(--green); }
-  .row.low .name { color:#5a4830; }
-  .row.low .price { color:#9a8760; }
-  .empty { color:var(--ink-soft); font-size:13px; font-style:italic; padding:12px 4px; }
-  .err { color:#8a2a2a; font-size:13px; padding:12px 4px; }
-  .spacer { flex:1; min-height:12px; }
+  .row.top .name, .row.top .price { color:#9a6b00; text-shadow:0 0 6px rgba(154,107,0,.25); }
+  .empty { color:var(--ink-soft); font-size:12px; font-style:italic; padding:8px 3px; }
+  .err { color:#8a2a2a; font-size:12px; padding:8px 3px; }
+  .spacer { flex:1; min-height:6px; }
   .footer {
     display:flex; justify-content:space-between; align-items:center;
-    font-size:12px; color:var(--ink-soft);
-    padding-top:8px; border-top:1px solid var(--line); margin-top:auto;
+    font-size:11px; color:var(--ink-soft);
+    padding-top:6px; border-top:1px solid var(--line); margin-top:auto;
   }
   .footer a { color:var(--gold); text-decoration:none; font-weight:bold; cursor:pointer; }
   .footer a:hover { text-decoration:underline; }
-  .priceline { font-size:12px; color:var(--ink-soft); text-align:right; font-style:italic; }
+  .priceline { font-size:11px; color:var(--ink-soft); text-align:right; font-style:italic; }
   .upd-banner {
-    text-align:center; font-size:13px; font-weight:bold; cursor:pointer;
+    text-align:center; font-size:12px; font-weight:bold; cursor:pointer;
     color:#7a1f1f; background:linear-gradient(#f0d9b0, #e6c896);
-    border:1px solid var(--gold); border-radius:3px; padding:6px 10px;
+    border:1px solid var(--gold); border-radius:3px; padding:4px 8px;
     box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
   .upd-banner:hover { text-decoration:underline; }
@@ -103,7 +109,18 @@
     <label class="corelbl">League:
       <select id="league"></select>
     </label>
+    <label class="corelbl">Hide:
+      <select id="minval">
+        <option value="0">Off</option>
+        <option value="0.01">≥0.01 div</option>
+        <option value="0.1">≥0.1 div</option>
+        <option value="1">≥1 div</option>
+        <option value="10">≥10 div</option>
+      </select>
+    </label>
     <button id="sel">Select region</button>
+    <button id="ovl">Overlay: OFF</button>
+    <button id="snd">Alert: OFF</button>
     <button id="scan">Scan now</button>
     <button id="ref">Refresh prices</button>
     <button id="chk">Check OCR</button>
@@ -116,7 +133,7 @@
   <div class="spacer"></div>
   <div id="pricesTime" class="priceline">Prices updated: —</div>
   <div class="footer">
-    <span>made by iulian.icb</span>
+    <span>made by iulian.icb · <span id="ver">v—</span></span>
     <a id="bmc">☕ Buy me a coffee</a>
   </div>
 </div>
@@ -125,6 +142,37 @@ const statusEl = document.getElementById("status");
 const listEl = document.getElementById("list");
 const leagueEl = document.getElementById("league");
 const pricesTimeEl = document.getElementById("pricesTime");
+const ovlBtn = document.getElementById("ovl");
+const sndBtn = document.getElementById("snd");
+const minvalEl = document.getElementById("minval");
+let overlayOn = false;
+let soundOn = false;
+let minDiv = 0;      // prag de afisare (in Divine); 0 = arata tot
+let curRows = [];
+// prag pt "market mover": variatie pe 7 zile peste care marcăm itemul ca pump
+const PUMP_PCT = 15;
+function setOvlBtn(on) { overlayOn = on; ovlBtn.textContent = "Overlay: " + (on ? "ON" : "OFF"); ovlBtn.classList.toggle("on", on); }
+function setSndBtn(on) { soundOn = on; sndBtn.textContent = "Alert: " + (on ? "ON" : "OFF"); sndBtn.classList.toggle("on", on); }
+
+// chime scurt (doua tonuri) prin Web Audio - fara fisiere de sunet
+let audioCtx = null;
+function ping() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const t0 = audioCtx.currentTime;
+    [880, 1318.5].forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      const s = t0 + i * 0.13;
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.28, s + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.28);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(s); o.stop(s + 0.32);
+    });
+  } catch {}
+}
 
 function setPricesTime(ts, stale) {
   const suffix = stale ? " (cached — offline)" : "";
@@ -140,21 +188,52 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+// mini-grafic 7 zile din sparkline.data (aceeasi logica precum in overlay)
+function sparkSvg(data, trend) {
+  if (!Array.isArray(data) || data.length < 2) return "";
+  const w = 46, h = 14, p = 1.5;
+  const min = Math.min(...data), max = Math.max(...data);
+  const span = (max - min) || 1;
+  const pts = data.map((v, i) => {
+    const x = p + (i / (data.length - 1)) * (w - 2 * p);
+    const y = p + (1 - (v - min) / span) * (h - 2 * p);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const col = trend === "down" ? "#8a2a2a" : trend === "up" ? "#2f6b34" : "#8a7a55";
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+}
+
 function render(rows, error) {
+  curRows = error ? [] : rows;
   if (error) { listEl.innerHTML = `<div class="err">${esc(error)}</div>`; return; }
-  if (!rows.length) { listEl.innerHTML = `<div class="empty">No items yet. Open Runeshape Combinations in game.</div>`; return; }
-  listEl.innerHTML = rows.map((r, i) => {
-    const price = r.display ? esc(r.display.text) : "?";
+  // cu overlay pornit, lista dispare complet din fereastra - totul se afiseaza doar in overlay
+  if (overlayOn) { listEl.innerHTML = `<div class="empty">Prices are shown in the in-game overlay.</div>`; return; }
+  // prag de valoare: ascundem itemele sub minDiv (in Divine)
+  const shown = rows.filter((r) => (r.totalDivine || 0) >= minDiv);
+  if (!shown.length) {
+    listEl.innerHTML = `<div class="empty">` + (rows.length ? "Nothing above the value threshold." : "No items yet. Open Runeshape Combinations in game.") + `</div>`;
+    return;
+  }
+  listEl.innerHTML = shown.map((r, i) => {
+    const ico = r.icon ? `<img class="ico" src="${esc(r.icon)}" alt="">` : "";
     const name = esc(r.matchedName || r.name);
     const tier = r.tier ? ` ${r.tier}` : "";
     const clickable = r.matchedName ? " clickable" : "";
-    const trend = r.trend === "up" ? '<span class="trend up">▲</span>' : r.trend === "down" ? '<span class="trend down">▼</span>' : "";
-    return `<div class="row${tier}${clickable}" data-i="${i}"><span class="name">${name}</span>${trend}<span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
+    const spark = `<span class="spark">${sparkSvg(r.trendData, r.trend)}</span>`;
+    let trend = '<span class="trend"></span>';
+    if (r.trend === "up" || r.trend === "down") {
+      const arrow = r.trend === "up" ? "▲" : "▼";
+      const pct = Number.isFinite(r.trendPct) ? " " + Math.abs(r.trendPct).toFixed(1) + "%" : "";
+      const pump = Number.isFinite(r.trendPct) && r.trendPct >= PUMP_PCT ? " pump" : "";
+      trend = `<span class="trend ${r.trend}${pump}">${arrow}${pct}</span>`;
+    }
+    const price = r.display ? esc(r.display.text) : "?";
+    return `<div class="row${tier}${clickable}" data-i="${i}">${ico}<span class="name">${name}</span>${spark}${trend}<span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
   }).join("");
   // click pe un rand cu preț -> pagina itemului pe poe.ninja (volum, istoric)
   listEl.querySelectorAll(".row.clickable").forEach((el) => {
     el.addEventListener("click", () => {
-      const r = rows[+el.dataset.i];
+      const r = shown[+el.dataset.i];
       if (r && r.matchedName) window.api.openItem({ league: leagueEl.value, category: r.category, name: r.matchedName });
     });
   });
@@ -176,6 +255,11 @@ async function boot() {
   leagueEl.innerHTML = leagues.map(l => `<option value="${l}">${l}</option>`).join("");
   leagueEl.value = cfg.league || leagues[0] || "";
   setPricesTime(cfg.pricesAt, cfg.pricesStale);
+  setOvlBtn(!!cfg.overlay);
+  setSndBtn(!!cfg.soundAlert);
+  minDiv = cfg.minDivine || 0;
+  minvalEl.value = String(minDiv);
+  document.getElementById("ver").textContent = "v" + (cfg.version || "?");
   statusEl.textContent = cfg.region ? "Region set. Scanning automatically." : "Choose a region first (Select region).";
   checkUpdateNow(true); // fire-and-forget, silent
 }
@@ -186,6 +270,33 @@ document.getElementById("sel").onclick = async () => {
   statusEl.textContent = "Drag a box over the Runeshape panel, then press Enter.";
   await window.api.selectRegion();
   statusEl.textContent = "Region saved. Scanning automatically.";
+};
+ovlBtn.onclick = async () => {
+  const r = await window.api.toggleOverlay(!overlayOn);
+  if (r.ok) {
+    setOvlBtn(r.on);
+    render(curRows, null);   // cu overlay ON ascundem preturile din fereastra principala
+    statusEl.textContent = r.on
+      ? "Overlay on — prices now show over the in-game panel."
+      : "Overlay off.";
+  } else {
+    statusEl.textContent = "Overlay: " + (r.error || "failed");
+  }
+};
+sndBtn.onclick = async () => {
+  const r = await window.api.setSoundAlert(!soundOn);
+  if (r.ok) {
+    setSndBtn(r.on);
+    statusEl.textContent = r.on
+      ? "Sound alert on — a chime plays when a new item is 1 Divine or more."
+      : "Sound alert off.";
+  }
+};
+minvalEl.onchange = async () => {
+  const r = await window.api.setMinValue(parseFloat(minvalEl.value) || 0);
+  if (r && r.ok) minDiv = r.minDivine || 0;
+  render(curRows, null);   // aplica pragul imediat, fara re-scan
+  statusEl.textContent = minDiv > 0 ? `Hiding items below ${minDiv} div.` : "Showing all items.";
 };
 document.getElementById("scan").onclick = async () => {
   statusEl.textContent = "Scanning…";
@@ -263,6 +374,15 @@ document.getElementById("dbg").onclick = () => {
 window.api.onScan((data) => {
   if (data.pricesAt) setPricesTime(data.pricesAt, data.pricesStale);
   render(data.rows, data.error);
+});
+
+// alerta sonora: item nou de la 1 Divine in sus
+window.api.onAlert((d) => {
+  ping();
+  const n = (d && d.count) || 1;
+  statusEl.textContent = n > 1
+    ? `Alert: ${n} new items worth 1 Divine or more.`
+    : "Alert: new item worth 1 Divine or more.";
 });
 
 boot();

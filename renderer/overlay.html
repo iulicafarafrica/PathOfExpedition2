@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://web.poecdn.com"
+/>
+<title>Path of Expedition Overlay</title>
+<style>
+  @font-face {
+    font-family: "Norse";
+    src: url("fonts/Norse.otf") format("opentype");
+    font-weight: normal;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: transparent; overflow: hidden;
+    user-select: none;
+  }
+  /* bara cu tot randul: nume + trend% + cantitate + pret, peste joc.
+     Fond aproape opac (lizibil peste orice) si latime = cat continutul
+     (width: max-content), ca sa acopere cat mai putin din joc. */
+  .bar {
+    position: absolute; left: 0;
+    display: flex; align-items: baseline; gap: 7px;
+    width: max-content; max-width: calc(100% - 4px);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 14px; white-space: nowrap;
+    color: #ead9a8;
+    background: rgba(6, 5, 4, .96);
+    border: 1px solid rgba(214, 198, 156, .55);
+    border-radius: 5px;
+    padding: 4px 10px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .95);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, .7);
+  }
+  .bar .name {
+    flex: 0 1 auto; min-width: 0; max-width: 190px;
+    overflow: hidden; text-overflow: ellipsis;
+    font-weight: bold;
+  }
+  .bar .trend { flex-shrink: 0; font-size: 11px; }
+  .bar .trend.up { color: #7ee08a; }
+  .bar .trend.down { color: #ff9090; }
+  /* market mover: crestere mare pe 7 zile -> evidentiat, bun de vandut */
+  .bar .trend.pump { color: #ffb347; font-weight: bold; }
+  .bar .price { flex-shrink: 0; color: #eddfb6; }
+  .bar .spark { flex-shrink: 0; }
+  .bar .ico { align-self: center; width: 18px; height: 18px; flex-shrink: 0; }
+  /* niveluri de valoare (praguri fixe in Divine) */
+  .bar.high .name, .bar.high .price { color: #86e592; }
+  .bar.high { border-color: rgba(134, 229, 146, .55); }
+  .bar.top .name, .bar.top .price { color: #ffd76a; }
+  .bar.top { border-color: rgba(240, 200, 90, .85); box-shadow: 0 0 7px rgba(240, 200, 90, .4); }
+  .bar.unknown .price { color: #9a8760; }
+</style>
+</head>
+<body>
+<div id="chips"></div>
+<script>
+const chipsEl = document.getElementById("chips");
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// mini-grafic 7 zile din sparkline.data (se deseneaza direct: ultima valoare == totalChange)
+function sparkSvg(data, trend) {
+  if (!Array.isArray(data) || data.length < 2) return "";
+  const w = 46, h = 14, p = 1.5;
+  const min = Math.min(...data), max = Math.max(...data);
+  const span = (max - min) || 1;
+  const pts = data.map((v, i) => {
+    const x = p + (i / (data.length - 1)) * (w - 2 * p);
+    const y = p + (1 - (v - min) / span) * (h - 2 * p);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const col = trend === "down" ? "#ff9090" : trend === "up" ? "#7ee08a" : "#cbbc92";
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+}
+
+// prag pt "market mover": variatie pe 7 zile peste care marcăm itemul ca pump
+const PUMP_PCT = 15;
+
+function render(data) {
+  const minDiv = (data && data.minDivine) || 0;   // prag de valoare (ascunde sub el)
+  const rows = ((data && data.rows) || []).filter((r) => r.y > 0 && (r.totalDivine || 0) >= minDiv);
+  const scale = (data && data.scale) || 1;
+  chipsEl.innerHTML = rows.map((r) => {
+    // sageata + procentul exact al variatiei (sparkline.totalChange, 7 zile)
+    let trend = "";
+    if (r.trend === "up" || r.trend === "down") {
+      const arrow = r.trend === "up" ? "▲" : "▼";
+      const pct = Number.isFinite(r.trendPct) ? ` ${Math.abs(r.trendPct).toFixed(1)}%` : "";
+      const pump = Number.isFinite(r.trendPct) && r.trendPct >= PUMP_PCT ? " pump" : "";
+      trend = `<span class="trend ${r.trend}${pump}">${arrow}${pct}</span>`;
+    }
+    const spark = sparkSvg(r.trendData, r.trend);
+    const ico = r.icon ? `<img class="ico" src="${esc(r.icon)}" alt="">` : "";
+    const name = esc(r.matchedName || r.name);
+    // pret unitar; totalul in paranteza doar daca sunt 2x/3x sau mai multe
+    const unit = r.dispUnit != null ? r.dispUnit : (r.display ? String(r.display.text).split(" (")[0] : "?");
+    const price = esc(unit) + (r.dispTotal != null ? ` (${esc(r.dispTotal)})` : "");
+    const top = Math.round(r.y / scale) - 5;
+    const tier = r.tier ? " " + esc(r.tier) : (r.display ? "" : " unknown");
+    return `<div class="bar${tier}" style="top:${top}px">${ico}<span class="name">${name}</span>${spark}${trend}<span class="price">${price}</span></div>`;
+  }).join("");
+}
+
+// overlay pur informativ: fereastra e mereu click-through, fara forward,
+// deci nu intercepteaza mouse-ul si nu introduce lag in joc.
+
+// acelasi canal "scan" ca fereastra principala (preload expune onScan)
+window.api.onScan(render);
+</script>
+</body>
+</html>

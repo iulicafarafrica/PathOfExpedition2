@@ -6,18 +6,32 @@ const { spawn } = require("child_process");
 const crypto = require("crypto");
 const { parseLines } = require("./rows");
 
+// alertele sonore pornesc fara gest de utilizator (altfel AudioContext-ul din renderer e blocat)
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+
 // ---------- logging ----------
 const LOG_FILE = path.join(os.tmpdir(), "xpc-debug.log");
 let logLines = [];        // buffer circular de loguri (pt fereastra Debug)
 let lastOcrLines = [];    // liniile OCR brute din ultimul scan (pt Debug)
 const LOG_BUF_MAX = 300;
+const LOG_MAX_BYTES = 1_000_000;   // ~1 MB; peste asta rotim (nu crestem la infinit in %TEMP%)
+let logBytes = 0;                  // dimensiunea curenta a fisierului de log (tinuta manual)
+try { logBytes = fs.statSync(LOG_FILE).size; } catch { logBytes = 0; }
 function pushLog(line) {
   logLines.push(line);
   if (logLines.length > LOG_BUF_MAX) logLines.shift();
 }
 function log(...args) {
   const line = `[${new Date().toISOString()}] ` + args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ");
-  try { fs.appendFileSync(LOG_FILE, line + "\n"); } catch {}
+  try {
+    if (logBytes > LOG_MAX_BYTES) {   // rotim: pastram o singura generatie (.1)
+      try { fs.renameSync(LOG_FILE, LOG_FILE + ".1"); } catch {}
+      logBytes = 0;
+    }
+    const chunk = line + "\n";
+    fs.appendFileSync(LOG_FILE, chunk);
+    logBytes += Buffer.byteLength(chunk);
+  } catch {}
   pushLog(line);
   console.log(line);
 }
@@ -26,6 +40,9 @@ log("configPath:", path.join(app.getPath ? "(app not ready)" : "", "config.json"
 
 let win = null;
 let debugWin = null;   // fereastra Debug (log OCR)
+let overlayWin = null;   // overlay-ul transparent peste panoul din joc
+let lastScanPayload = null;  // ultimul scan reusit (repornit odata cu overlay-ul)
+let lastCaptureK = 0;   // raportul px fizici/DIP al ultimei capturi (alinierea chipurilor)
 let config = loadConfig();
 let pollTimer = null;
 let selectOpen = false;   // True cand box-ul de selectie e deschis (nu fac scan)
@@ -178,6 +195,11 @@ function ocrRecognize(imagePath) {
   });
 }
 let lastRows = [];
+let scanning = false;        // guard: nu suprapunem doua scan-uri (poll + buton)
+let lastScanHash = null;     // hash-ul ultimei capturi OCR-uite (skip daca ecranul n-a schimbat)
+let lastScanPricesAt = 0;    // fetchedAt-ul preturilor de la ultimul OCR (refacem daca s-au schimbat)
+const ALERT_MIN_DIVINE = 1;  // alerta sonora: item (stack) de la 1 Divine in sus
+let lastAlertSet = new Set();// itemele scumpe de la scanul anterior (ca sa nu sunăm repetat)
 
 // ---------- health-check OCR (butonul "Check OCR") ----------
 // Verifica daca Windows OCR (WinRT Windows.Media.Ocr) e disponibil, ce limbi sunt
@@ -228,6 +250,13 @@ const GITHUB_API_LATEST = `https://api.github.com/repos/${GITHUB_REPO}/releases/
 function parseVer(v) {
   return String(v || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
 }
+// Extrage "1.2.3" dintr-un tag ("v1.0.4") SAU din numele release-ului
+// ("Path of Expedition 1.0.4"). Asa update-ul merge si daca tag-ul nu e semver
+// curat (ex. "Pathofexepedition103" -> luam versiunea din nume).
+function extractVersion(s) {
+  const m = String(s || "").match(/(\d+)\.(\d+)(?:\.(\d+))?/);
+  return m ? `${m[1]}.${m[2]}.${m[3] || "0"}` : null;
+}
 function isNewerVer(latest, current) {
   const a = parseVer(latest), b = parseVer(current);
   for (let i = 0; i < 3; i++) {
@@ -245,11 +274,18 @@ async function checkUpdate() {
     if (r.status === 404) return { ok: true, updateAvailable: false, reason: "no-releases" };
     if (!r.ok) return { ok: false, status: r.status };
     const j = await r.json();
-    const latest = String(j.tag_name || "").replace(/^v/i, "");
+    // versiunea: din tag, altfel din numele release-ului (tag-urile nu-s mereu semver)
+    const latest = extractVersion(j.tag_name) || extractVersion(j.name) || "";
     const cur = app.getVersion();
     const assets = (j.assets || [])
       .filter((a) => /\.exe$/i.test(a.name))
-      .map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size }));
+      .map((a) => ({
+        name: a.name,
+        url: a.browser_download_url,
+        size: a.size,
+        // sha256-ul asset-ului (GitHub il expune ca "digest": "sha256:...") pt verificare
+        sha256: String(a.digest || "").replace(/^sha256:/i, "").toLowerCase() || null,
+      }));
     return {
       ok: true,
       current: cur,
@@ -280,6 +316,18 @@ async function doUpdate(asset) {
   const r = await fetch(asset.url, { headers: { "User-Agent": NINJA_UA } });
   if (!r.ok) throw new Error(`Download failed (HTTP ${r.status})`);
   const buf = Buffer.from(await r.arrayBuffer());
+  // Integritate: dimensiunea + sha256 (din metadatele release-ului GitHub).
+  // Daca nu se potrivesc, NU rulam binarul corupt/alterat.
+  if (asset.size && buf.length !== asset.size) {
+    throw new Error(`Size mismatch (expected ${asset.size}, got ${buf.length}) — download aborted`);
+  }
+  if (asset.sha256) {
+    const h = crypto.createHash("sha256").update(buf).digest("hex");
+    if (h !== asset.sha256) throw new Error("SHA-256 mismatch — download aborted");
+    log(`update: sha256 ok (${h})`);
+  } else {
+    log("update: release fara sha256 — verificare de integritate sarita");
+  }
   fs.writeFileSync(dest, buf);
   log(`update: downloaded ${asset.name} (${buf.length} bytes) -> ${dest}`);
   const launchErr = await shell.openPath(dest); // pornește noul exe / installerul
@@ -342,6 +390,19 @@ function sparkTrend(sp) {
   if (t < -0.5) return "down";
   return "flat";
 }
+// procentul exact al variatiei (sparkline.totalChange, 7 zile) -> pe chipuri
+function sparkPct(sp) {
+  const t = sp && typeof sp === "object" ? parseFloat(sp.totalChange) : NaN;
+  return Number.isFinite(t) ? t : null;
+}
+// seria de 7 valori (curba pe 7 zile) -> mini-graficul din overlay. Se deseneaza
+// direct, fara acumulare: ultima valoare == totalChange (verificat live pe API).
+function sparkData(sp) {
+  const d = sp && Array.isArray(sp.data) ? sp.data : null;
+  if (!d) return null;
+  const nums = d.map((v) => Math.round(parseFloat(v) * 10) / 10).filter((v) => Number.isFinite(v));
+  return nums.length >= 2 ? nums : null;
+}
 function normName(s) {
   return (s || "")
     .toLowerCase()
@@ -352,6 +413,16 @@ function normName(s) {
 // pentru matching: normalizeaza si posesivele (jeweller s -> jewellers)
 function matchKey(s) {
   return normName(s).replace(/\b(\w+) s\b/g, "\$1s").replace(/\s+/g, " ").trim();
+}
+// Tier de valoare ABSOLUT (in Divine), folosit pt evidentierea randurilor in UI.
+// Praguri fixe ca sa fie constante intre scanuri (nu relative la ce e pe ecran):
+//   "top" >= 10 div (auriu), "high" >= 1 div (verde), restul = fara clasa.
+// (NU estompam itemele ieftine: toate se afiseaza la fel de lizibil.)
+function valueTier(div) {
+  if (div == null) return null;
+  if (div >= 10) return "top";
+  if (div >= 1) return "high";
+  return null;
 }
 async function fetchPrices(league) {
   log("fetchPrices: START league=", league);
@@ -386,7 +457,10 @@ async function fetchPrices(league) {
         if (!it || !it.name) continue;
         // pretul in Divine: primaryValue e in moneda primara -> convertim
         const divine = (line.primaryValue || 0) * (divPerPrimary || 1);
-        out.push({ id: line.id, name: it.name, price: divine, category: it.category, trend: sparkTrend(line.sparkline) });
+        // iconita itemului: poe.ninja da doar calea relativa (/gen/image/...), iar
+        // fisierele reale stau pe CDN-ul official (verificat live: web.poecdn.com -> 200)
+        const icon = it.image ? "https://web.poecdn.com" + it.image : null;
+        out.push({ id: line.id, name: it.name, price: divine, category: it.category, trend: sparkTrend(line.sparkline), trendPct: sparkPct(line.sparkline), trendData: sparkData(line.sparkline), icon });
       }
       if (out.length) log("fetchPrices:", type, "->", out.length, "itemuri (primary=" + primary + ")");
       return out;
@@ -560,7 +634,7 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 function loadConfig() {
-  const defaults = { league: "Forbidden Rites", region: null };
+  const defaults = { league: "Forbidden Rites", region: null, overlay: false, soundAlert: false, minDivine: 0 };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
     log("loadConfig: citit", raw.length, "chari");
@@ -608,6 +682,9 @@ function createWindow() {
     const r = win.getBounds();
     config.window = { x: r.x, y: r.y, width: r.width, height: r.height };
     saveConfig();
+    // daca inchidem fereastra principala, dispare si overlay-ul (fara fantome peste joc)
+    if (overlayWin && !overlayWin.isDestroyed()) overlayWin.close();
+    overlayWin = null;
   });
 }
 
@@ -655,14 +732,24 @@ async function captureRegion(region) {
   return { width: pw, height: ph, data: out };
 }
 // ---------- OCR (Windows OCR nativ) + parsing ----------
-async function doScan() {
-  log("doScan: START");
+async function doScan(force) {
   if (selectOpen) { log("doScan: selectOpen, sarit"); return { rows: [], error: null };
   }
   if (!config.region) { log("doScan: fara regiune"); return { rows: [], error: "Choose a region first (Select region)." };
   }
   try {
     let shot = await captureRegion(config.region);
+    if (config.region && shot.width) lastCaptureK = shot.width / config.region.width;  // pt alinierea chipurilor din overlay
+    // PERFORMANTA: daca pixelii regiunii sunt identici cu ultimul scan SI preturile
+    // nu s-au reimprospatat, nu mai pornim OCR-ul (cel mai scump pas) - refolosim
+    // ultimul rezultat. Asa nu mai consumam CPU la fiecare 3s cand nu se schimba nimic.
+    const pHash = crypto.createHash("sha1")
+      .update(Buffer.from(shot.data.buffer, shot.data.byteOffset, shot.data.byteLength))
+      .digest("hex");
+    if (!force && pHash === lastScanHash && priceCache.fetchedAt === lastScanPricesAt) {
+      return { rows: lastRows, at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale, unchanged: true };
+    }
+    log("doScan: START");
     // salvam PNG in temp (cu path Windows ca sa mearga WinRT StorageFile)
     const img = nativeImage.createFromBitmap(Buffer.from(shot.data), { width: shot.width, height: shot.height });
     const tmp = path.join(os.tmpdir(), `xpc-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.png`).replace(/\//g, "\\");
@@ -676,10 +763,10 @@ async function doScan() {
       .filter((l) => l.text.length > 0);
     lastOcrLines = lines.map((l) => l.text);   // pt fereastra Debug
     const rows = parseLines(lines);
-    log("doScan: rows parseate=", rows.length, JSON.stringify(rows.map((r) => r.qty + "x" + r.name)));
     // FILTRU CHAT: pastram doar randuri cu cantitate explicita (Nx) SAU item cunoscut in API.
     // Chat-ul din joc (peste panou) nu are nici "Nx", nici nu e un item -> e respins.
     const kept = [];
+    let filtered = 0;   // cate linii au fost respinse ca zgomot (nu le logam individual)
     for (const r of rows) {
       const p = lookupPrice(r.name);
       const qty = r.qty || 1;
@@ -687,6 +774,9 @@ async function doScan() {
         r.matchedName = p ? p.name : null;
         r.category = p ? p.category : null;      // pt linkul catre pagina itemului pe poe.ninja
         r.trend = p ? p.trend : null;            // "up" | "down" | "flat" | null
+        r.trendPct = p ? p.trendPct : null;      // variatia in % pe 7 zile (pe chipuri)
+        r.trendData = p ? p.trendData : null;    // seria de 7 valori (mini-graficul din overlay)
+        r.icon = p ? p.icon : null;              // iconita itemului (CDN poecdn)
       r.totalDivine = p ? p.price * qty : null;  // TOTALUL stack-ului in Divine (pt tier)
       // Pretul afisat = TOTALUL stack-ului; pentru qty>1 aratam si unitar.
       const total = p ? displayPrice(p.price * qty, "auto") : null;
@@ -694,21 +784,37 @@ async function doScan() {
       r.display = total
         ? { value: total.value, currency: total.currency, text: total.text + (unit ? ` (${unit.text} each)` : "") }
         : null;
-      if (!p && !r.explicit) { log("doScan: FILTRU (chat/zgomot):", JSON.stringify(r.raw)); continue; }
+      // pt overlay: pretul UNITAR principal, iar in paranteza TOTALUL doar daca qty>1
+      const u = p ? displayPrice(p.price, "auto") : null;
+      const t = (p && qty > 1) ? displayPrice(p.price * qty, "auto") : null;
+      r.dispUnit = u ? u.text : null;
+      r.dispTotal = t ? t.text : null;
+      if (!p && !r.explicit) { filtered++; continue; }   // zgomot (chat/fereastra straina)
       kept.push(r);
     }
-    // Tier pe valoare (valueTier high/mid/low) -> pentru colorare in UI.
-    const priced = kept.filter((r) => r.totalDivine != null).map((r) => r.totalDivine);
-    if (priced.length) {
-      const max = Math.max(...priced);
-      const min = Math.min(...priced);
-      for (const r of kept) {
-        if (r.totalDivine == null) { r.tier = null; continue; }
-        r.tier = r.totalDivine === max ? "high" : r.totalDivine === min ? "low" : "mid";
-      }
-    }
+    // Tier pe valoare absoluta (in Divine) -> colorare constanta in UI.
+    for (const r of kept) r.tier = valueTier(r.totalDivine);
     rows.length = 0; rows.push(...kept);
     lastRows = rows;
+    lastScanHash = pHash;
+    lastScanPricesAt = priceCache.fetchedAt;
+    log("doScan: rows=", rows.length, "(filtrate", filtered + ")", JSON.stringify(rows.map((r) => r.qty + "x" + r.name)));
+    // ALERTA SONORA: item nou (fata de scanul anterior) cu valoare >= 1 Divine.
+    // Comparăm setul de nume scumpe ca sa sunăm o singura data per item nou.
+    const highNow = new Set();
+    let newHigh = 0;
+    for (const r of rows) {
+      if ((r.totalDivine || 0) >= ALERT_MIN_DIVINE) {
+        const key = String(r.matchedName || r.name).toLowerCase();
+        highNow.add(key);
+        if (!lastAlertSet.has(key)) newHigh++;
+      }
+    }
+    lastAlertSet = highNow;
+    if (config.soundAlert && newHigh > 0) {
+      log("alert: iteme noi >= " + ALERT_MIN_DIVINE + " div:", newHigh);
+      if (win && !win.isDestroyed()) win.webContents.send("alert", { count: newHigh });
+    }
     return { rows, at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale };
   } catch (e) {
     return { rows: [], error: String(e) };
@@ -716,21 +822,120 @@ async function doScan() {
 }
 
 // ---------- polling ----------
+// Un singur punct de intrare pt scan: nu suprapune scan-uri si nu re-trimite
+// catre UI cand rezultatul e neschimbat (mai putin IPC + mai putine re-render-uri).
+async function runScan(force) {
+  if (scanning) return { rows: lastRows, at: Date.now(), busy: true };
+  scanning = true;
+  try {
+    const r = await doScan(force === true);
+    if (!r.unchanged) broadcast(r);
+    return r;
+  } finally {
+    scanning = false;
+  }
+}
 function startPoll() {
   stopPoll();
   log("startPoll: pornit");
-  pollTimer = setInterval(async () => {
-    const r = await doScan();
-    win?.webContents.send("scan", r);
-  }, 3000);
+  pollTimer = setInterval(() => { runScan(false); }, 3000);
 }
 function stopPoll() {
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = null;
 }
 
+// ---------- overlay in-game (chip-uri cu preturi peste panou) ----------
+// Fereastra acopera DOAR banda de chipuri din dreapta regiunii (nu si panoul):
+// chipurile stau in afara chenarului Runeshape (nu acopera numele itemelor) si
+// suprafata compusa peste joc e mica -> nu incomodeaza jocul (fara lag).
+const OVERLAY_STRIP = 420;   // px DIP de banda libera in dreapta regiunii
+                              // (bara: nume + mini-grafic + trend% + cantitate + pret)
+
+function overlayBounds() {
+  const r = config.region;
+  if (!r) return null;
+  return { x: r.x + r.width, y: r.y, width: OVERLAY_STRIP, height: r.height };
+}
+// Fereastra e transparenta si click-through (jocul ramane jucabil). NU mai e
+// exclusa din screen capture: sta in banda din DREAPTA regiunii (x = region.x +
+// region.width), deci nu se suprapune niciodata cu crop-ul OCR si poti face
+// screenshot overlay-ului in joc. Pozitia = regiunea salvata (aceleasi coordonate
+// DIP pe care le foloseste si crop-ul capturii).
+function overlayScale() {
+  const reg = config.region;
+  const disp = reg
+    ? screen.getDisplayNearestPoint({ x: reg.x + reg.width / 2, y: reg.y + reg.height / 2 })
+    : screen.getPrimaryDisplay();
+  return disp.scaleFactor || 1;
+}
+let lastOverlaySig = "";   // semnatura continutului trimis ultima data (skip re-render inutil)
+function sendOverlay(r) {
+  if (!overlayWin || overlayWin.isDestroyed()) return;
+  if (r && r.error) return; // pe o eroare de scan nu stergem ce e afisat
+  const payload = r && r.rows ? r : (lastScanPayload || { rows: [] });
+  const k = lastCaptureK || overlayScale();
+  // PERFORMANTA: daca ce s-ar afisa e identic cu ultimul frame, nu mai trimitem
+  // IPC si nu mai re-randam overlay-ul (malloc inutil). k intra in semnatura pt ca
+  // pozitionarea barelor depinde de scale.
+  const sig = JSON.stringify([k, !!payload.pricesStale, config.minDivine,
+    (payload.rows || []).map((x) => [x.name, x.y, x.dispUnit, x.dispTotal, x.trend, x.trendPct, x.tier, x.icon])]);
+  if (sig === lastOverlaySig) return;
+  lastOverlaySig = sig;
+  // inaltimea ferestrei urmeaza intinderea randurilor (nu tot panoulul -> mai putin lag)
+  const ys = (payload.rows || []).map((x) => x.y || 0);
+  const h = Math.min(1200, Math.max(140, Math.round((ys.length ? Math.max(...ys) : 0) / k) + 56));
+  const b = overlayBounds();
+  if (b && Math.abs(overlayWin.getBounds().height - h) > 12) overlayWin.setBounds({ ...b, height: h });
+  overlayWin.webContents.send("scan", { ...payload, scale: k, minDivine: config.minDivine });
+}
+function broadcast(r) {
+  if (r && !r.error) lastScanPayload = r;
+  win?.webContents.send("scan", r);
+  sendOverlay(r);
+}
+function toggleOverlay(on) {
+  if (on !== true) {
+    config.overlay = false;
+    saveConfig();
+    if (overlayWin && !overlayWin.isDestroyed()) overlayWin.close();
+    overlayWin = null;
+    lastOverlaySig = "";   // urmatoarea pornire va re-trimite frame-ul complet
+    return { ok: true, on: false };
+  }
+  if (!config.region) return { ok: false, on: false, error: "Set a region first (Select region)." };
+  const b = overlayBounds();
+  lastOverlaySig = "";   // la (re)creare re-trimitem frame-ul complet
+  if (overlayWin && !overlayWin.isDestroyed()) { overlayWin.setBounds(b); return { ok: true, on: true }; }
+  overlayWin = new BrowserWindow({
+    x: b.x, y: b.y, width: b.width, height: b.height,
+    frame: false, transparent: true, resizable: false, movable: false,
+    focusable: false, skipTaskbar: true, hasShadow: false, show: false,
+    alwaysOnTop: true,
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
+  });
+  overlayWin.setAlwaysOnTop(true, "screen-saver");   // peste joc (borderless)
+  // FARA setContentProtection: overlay-ul e in afara regiunii OCR, deci poate fi
+  // fotografiat/screen-recorded normal (Snipping Tool, Print Screen, OBS).
+  // 100% click-through, fara "forward": fereastra nu primeste NICIUN eveniment
+  // de mouse, deci nu introduce lag de input in joc (overlay pur informativ).
+  overlayWin.setIgnoreMouseEvents(true);
+  overlayWin.setMenuBarVisibility(false);
+  overlayWin.loadFile(path.join(__dirname, "renderer", "overlay.html"));
+  overlayWin.once("ready-to-show", () => {
+    if (overlayWin && !overlayWin.isDestroyed()) {
+      overlayWin.showInactive();   // nu fura focusul de la joc
+      sendOverlay(null);
+    }
+  });
+  overlayWin.on("closed", () => { overlayWin = null; lastOverlaySig = ""; });  // config.overlay ramane cum e salvat
+  config.overlay = true;
+  saveConfig();
+  return { ok: true, on: true };
+}
+
 // ---------- IPC ----------
-ipcMain.handle("get-config", () => ({ ...config, availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale }));
+ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale }));
 // health-check Windows OCR (butonul "Check OCR")
 ipcMain.handle("check-ocr", () => checkOcrHealth());
 // update: verificare ultimul release GitHub + descarcare/lanare
@@ -824,7 +1029,7 @@ ipcMain.handle("set-league", async (_e, league) => {
   // re-incarca preturile pentru noua liga
   try { await fetchPrices(league); } catch {}
   // re-scaneaza imediat (daca regiunea e deja setata) ca sa afiseze noile preturi
-  if (config.region) { const r = await doScan(); win?.webContents.send("scan", r); }
+  if (config.region) await runScan(false);
   return league;
 });
 ipcMain.handle("refresh-prices", async () => {
@@ -835,9 +1040,32 @@ ipcMain.handle("refresh-prices", async () => {
     return { ok: false, error: String(e) };
   }
 });
-ipcMain.handle("scan-now", () => doScan());
+ipcMain.handle("scan-now", async () => {
+  const r = await runScan(true);   // fortat: utilizatorul a cerut un scan nou
+  return r;   // broadcast() a trimis deja rezultatul catre ambele ferestre
+});
+// pornire/oprire overlay in joc (butonul "Overlay" din fereastra principala);
+// primeste doar boolean, nimic altceva
+ipcMain.handle("toggle-overlay", (_e, on) => toggleOverlay(on === true));
+// alerta sonora la item >= 1 Divine: doar boolean, persistat in config
+ipcMain.handle("set-sound-alert", (_e, on) => {
+  config.soundAlert = on === true;
+  saveConfig();
+  lastAlertSet = new Set();   // re-armăm: la urmatorul scan valutăm ce e pe ecran
+  return { ok: true, on: config.soundAlert };
+});
+// prag de afisare (in Divine): ascunde itemele sub valoarea aleasa. 0 = arata tot.
+ipcMain.handle("set-min-value", (_e, v) => {
+  const n = Number(v);
+  config.minDivine = Number.isFinite(n) && n > 0 ? n : 0;
+  saveConfig();
+  sendOverlay(lastScanPayload);   // re-trimite catre overlay ca sa aplice filtrul
+  return { ok: true, minDivine: config.minDivine };
+});
+
 ipcMain.handle("select-region", async () => {
   selectOpen = true;   // nu fac scan cat timp box-ul e deschis
+  if (overlayWin && !overlayWin.isDestroyed()) overlayWin.hide();  // nu acoperim box-ul de selectie
   // deschide o fereastra mica simpla de selectie (drag box)
   const sel = new (require("electron").BrowserWindow)({
     width: 500,
@@ -856,10 +1084,12 @@ ipcMain.handle("select-region", async () => {
     ipcMain.once("region-selected", (_e, region) => {
       log("region-selected: primit", JSON.stringify(region));
       selectOpen = false;
+      const ovl = overlayWin && !overlayWin.isDestroyed() ? overlayWin : null;
       const r = region || {};
       if (![r.x, r.y, r.width, r.height].every((n) => Number.isFinite(n)) || r.width < 40 || r.height < 30) {
         log("region rejected: geometrie invalida");
         try { sel.close(); } catch {}
+        if (ovl) ovl.showInactive();   // regiune neschimbata -> repunem overlay-ul
         resolve(null);
         return;
       }
@@ -868,6 +1098,10 @@ ipcMain.handle("select-region", async () => {
         const disp = screen.getDisplayNearestPoint({ x: region.x + region.width / 2, y: region.y + region.height / 2 });
         config.region = { x: region.x, y: region.y, width: region.width, height: region.height, displayId: disp.id };
         saveConfig();
+        // overlay-ul se repoziționeaza pe noua regiune (cu banda din dreapta)
+        if (ovl) { ovl.setBounds(overlayBounds()); ovl.showInactive(); }
+        lastScanHash = null;   // regiune noua -> primul scan trebuie sa ruleze OCR
+        lastOverlaySig = "";   // si overlay-ul trebuie re-randat complet
         startPoll();   // porneste scanarea automata imediat ce regiunea e setata
         sel.close();
         resolve(config.region);
@@ -892,6 +1126,8 @@ app.whenReady().then(async () => {
   try { await fetchPrices(config.league || "Forbidden Rites"); } catch {}
   // daca regiunea e deja salvata, porneste scanarea automata (fara buton Start)
   if (config.region) startPoll();
+  // repune overlay-ul daca era pornit la ultima rulare
+  if (config.overlay) toggleOverlay(true);
   // auto-refresh preturi la 30 min
   setInterval(async () => {
     try {

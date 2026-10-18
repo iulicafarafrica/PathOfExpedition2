@@ -78,7 +78,7 @@ function parseLines(lines) {
     if (!r) continue;
     // respinge titlul: prima linie (peste banda) fara multiplicator explicit
     if (!r.explicit && Math.abs((l.y || 0) - topY) < TITLE_BAND) continue;
-    out.push(r);
+    out.push({ ...r, y: l.y || 0 });
   }
   return out;
 }

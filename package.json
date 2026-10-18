@@ -1,6 +1,6 @@
 {
   "name": "path-of-expedition",
-  "version": "1.0.2",
+  "version": "1.0.8",
   "private": true,
   "description": "PoE2 Expedition Runeshape price checker",
   "main": "main.js",
