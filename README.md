@@ -37,7 +37,7 @@ Your region and league are saved, so the next time you launch it just picks up w
 | Auto currency | Cheap items show in exalted, expensive ones in divine — same rounding rules as the poe.ninja site, so numbers match what you'd see there. |
 | Stack totals | Prices are shown for the whole stack (`5x` = 5 × unit), with the unit price in parentheses when qty > 1. |
 | Price trend | A little ▲ (green) / ▼ (red) arrow next to the name shows whether the item went up or down over the last 7 days (poe.ninja data), so you know if now's the time to sell. |
-| Value tiers | Rows are colour-coded by value: **gold** for 10+ Divine, **green** for 1+ Divine, dimmed for under 0.1 Divine. Easy to spot what mattered. |
+| Value tiers | Rows are highlighted by value — **gold** for 10+ Divine, **green** for 1+ Divine. Everything else stays fully readable (nothing is greyed out). Easy to spot what mattered. |
 | Market movers | Items rising sharply over the last 7 days (15%+) are highlighted, so you can see what's worth selling right now. |
 | Hide filter | Pick a minimum value (Off / ≥0.01 / ≥0.1 / ≥1 / ≥10 Divine) to hide cheap drops from both the overlay and the list — keeps the screen clean during a busy run. |
 | League switch | Change league in-app; prices reload and the current panel is re-priced immediately. |
