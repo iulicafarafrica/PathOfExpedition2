@@ -1,8 +1,8 @@
 # Path of Expedition
 
-![Path of Expedition](ss1.png)
+![Path of Expedition](screenshot-window.png)
 
-A small Windows desktop app for Path of Exile 2. It reads the Expedition reward panel from your screen and tells you what those drops are actually worth, using live prices from poe.ninja.
+A small Windows desktop app for Path of Exile 2. It reads the Expedition reward panel from your screen and tells you what those drops are actually worth, using live prices from poe.ninja — right over the game, in a click-through in-game overlay, or in a compact window.
 
 **This project is not affiliated with, endorsed by, or sponsored by Grinding Gear Games.** "Path of Exile", "Path of Exile 2", and related marks belong to Grinding Gear Games. This tool is a fan-made convenience; GGG's ToS apply to everything you do in-game. It is also not affiliated with poe.ninja — the app just uses their public exchange API for prices, same as their own website does.
 
@@ -18,7 +18,7 @@ A small Windows desktop app for Path of Exile 2. It reads the Expedition reward 
 2. Run it and pick your **league** from the dropdown.
 3. In-game, open the **Runeshape Combinations** panel.
 4. Click **Select region**, drag the green box over the reward panel and resize it to cover the list, then press **Enter**.
-5. That's it. It scans the panel every 3 seconds and shows the running total as items land.
+5. That's it. It scans the panel every 3 seconds and shows the running total as items land. Hit **Overlay** to draw the prices straight over the game (see [In-game overlay](#in-game-overlay)).
 
 Your region and league are saved, so the next time you launch it just picks up where you left off. If you move the game window, re-select the region.
 
@@ -26,24 +26,44 @@ Your region and league are saved, so the next time you launch it just picks up w
 
 | Feature | What it does |
 | --- | --- |
+| In-game overlay | Prices are drawn over the game, aligned with each item row — no alt-tabbing. It's a transparent, **click-through** window: the game keeps all your mouse input and there's **no added lag**, and it only covers as much screen as the text needs. Toggle with **Overlay**. |
+| Sound alert | A short chime plays when a new item worth **1 Divine or more** appears. Toggle with **Alert** — it's remembered between sessions and rings only once per new item. |
 | Region capture | You frame the part of the screen that matters (the reward list). It works on multi-monitor setups and handles DPI scaling, so 125%/150% displays are fine. |
 | Windows OCR | Reads the panel text using the OCR built into Windows itself — no cloud, no extra engine, no model downloads. See [How the OCR works](#how-the-ocr-works). |
 | Smart name matching | OCR isn't perfect, so matching is layered: exact → digit fixes (`0→o`, `1→l`, …) → prefix → fuzzy edit-distance. It also fixes possessives ("Jeweller s" → "Jewellers") and refuses to guess levels on uncut gems. |
 | Live poe.ninja prices | Pulls the exchange overview for Currency, Runes, Expedition, Verisium and UncutGems, normalizes everything to "per 1 Divine", and converts it to the league's primary currency correctly (exalted on HC, divine on softcore). |
+| Item icons | Each row shows the real item icon (served from poe.ninja's image CDN), so the list is easy to scan at a glance. |
 | Item page link | Click a row and its poe.ninja item page opens in your browser (volume, price history) — same league as selected. |
 | Auto currency | Cheap items show in exalted, expensive ones in divine — same rounding rules as the poe.ninja site, so numbers match what you'd see there. |
 | Stack totals | Prices are shown for the whole stack (`5x` = 5 × unit), with the unit price in parentheses when qty > 1. |
 | Price trend | A little ▲ (green) / ▼ (red) arrow next to the name shows whether the item went up or down over the last 7 days (poe.ninja data), so you know if now's the time to sell. |
-| Value tiers | The most valuable drop glows green, the least is dimmed. Easy to spot what mattered. |
+| Value tiers | Rows are colour-coded by value: **gold** for 10+ Divine, **green** for 1+ Divine, dimmed for under 0.1 Divine. Easy to spot what mattered. |
+| Market movers | Items rising sharply over the last 7 days (15%+) are highlighted, so you can see what's worth selling right now. |
+| Hide filter | Pick a minimum value (Off / ≥0.01 / ≥0.1 / ≥1 / ≥10 Divine) to hide cheap drops from both the overlay and the list — keeps the screen clean during a busy run. |
 | League switch | Change league in-app; prices reload and the current panel is re-priced immediately. |
 | Auto-scan | Scans every 3 s once a region is set. No start/stop button to forget. |
 | Price auto-refresh | Prices reload every 30 minutes (poe.ninja caches ~5 min anyway); **Refresh prices** forces it on demand. |
 | Offline cache | If poe.ninja or your network is down, the app keeps working off the last price snapshot (marked "cached — offline") and recovers automatically as soon as the site answers again. |
 | Chat/noise filter | Chat lines and panel noise that isn't a priced item and has no explicit `Nx` quantity get dropped, so the list stays clean. |
-| Update check | Checks GitHub Releases on launch and every 30 min. When a newer release is out, a banner appears and **Update now** downloads and launches it. |
+| Update check | Checks GitHub Releases on launch and every 30 min. When a newer release is out, a banner appears and **Update now** downloads and launches it (SHA-256 verified). |
 | Check OCR | Verifies that the Windows OCR engine is present and which languages are installed. Useful when the text looks garbled. |
 | Debug window | Shows the raw OCR lines and an app log for the last scans — the first place to look when something reads wrong. |
+| Screenshot & recording | The overlay is capturable, so you can screenshot or record your run with Snipping Tool, Print Screen or OBS. |
+| Version in footer | The footer shows the app version, so you always know which build you're running. |
 | Buy me a coffee | If it saves you money or sanity, a coffee is appreciated: https://buymeacoffee.com/iulian.icb |
+
+## In-game overlay
+
+![Prices drawn over the Runeshape panel](screenshot-overlay.jpeg)
+
+Turn the overlay **on** and the prices are drawn straight over the game, lined up with each row of the reward panel — no alt-tabbing, no second monitor needed. It is a transparent, **click-through** window: the game keeps all of your mouse input and the overlay adds no input lag. Each bar is only as wide as its text, so it covers as little of the game as possible, and the background is nearly opaque so it stays readable over any scene.
+
+Notes:
+
+- Requires **borderless windowed** mode — a true exclusive-fullscreen mode hides any overlay.
+- While the overlay is on, the app window's list is hidden (everything shows in-game instead). Turn the overlay off and the list comes back in the window.
+- You can screenshot and record the overlay normally (Snipping Tool, Print Screen, OBS).
+- The overlay sits just to the **right** of the region you selected, so pick a region with a bit of free space to its right.
 
 ## How the OCR works
 
@@ -65,12 +85,14 @@ If in-game text comes out garbled or items don't match, hit **Check OCR** in the
 
 ## Tech
 
-- **Electron** — main process in Node.js (capture, OCR, prices, IPC), `contextIsolation` + sandboxed renderer, no remote code, navigation locked down.
+- **Electron** — main process in Node.js (capture, OCR, prices, overlay, IPC), `contextIsolation` + sandboxed renderer, no remote code, navigation locked down.
 - **electron-builder** — ships as a portable `.exe` and an NSIS installer (x64).
-- **Vanilla HTML/CSS/JS** for the UI — one screen, no framework, no build step for the renderer.
+- **Vanilla HTML/CSS/JS** for the UI — two screens (main window + overlay), no framework, no build step for the renderer.
 - **WinRT OCR via PowerShell** (`System.Runtime.WindowsRuntime` → `Windows.Media.Ocr`, `Windows.Graphics.Imaging`) — Windows-native recognition, no external OCR dependency.
+- **Web Audio API** for the alert chime — generated in code, no sound files.
 - **poe.ninja exchange API** (`/poe2/api/economy/exchange/current/overview`) — same data their website displays; results normalized to per-1-Divine internally.
-- **GitHub Releases API** — update detection and download.
+- **poe.ninja image CDN** — item icons.
+- **GitHub Releases API** — update detection and download (with SHA-256 verification).
 
 Dev notes: `npm run dev` runs it unpackaged, `npm run dist` builds both executables into `dist/`.
 
@@ -81,6 +103,7 @@ The whole app is in this repository, [MIT licensed](LICENSE), and there is no hi
 **What it talks to over the network** (full list, verifiable in `main.js`):
 
 - `poe.ninja` exchange API — prices (the same endpoint their website uses)
+- `web.poecdn.com` — item icons
 - `api.github.com` — this repo's release feed, for the update check
 - the release's `.exe` download URL — **only** when you press "Update now"
 - buymeacoffee.com — **only** when you click the footer link
@@ -100,12 +123,13 @@ The executables land in `dist/`. `package-lock.json` pins the dependencies, so a
 
 **VirusTotal scan of the current build:** <https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==>. (New releases get a new hash — feel free to re-scan before running.)
 
-**"Wait, my antivirus flagged it?"** — that happens, and it's worth understanding. A single engine (so far: McAfee) reports a detection like `Ti!89ED4493BBF4`. That name is **not a known virus** — it's the first 12 characters of the file's own SHA-256, which is how McAfee labels its *generic behavioral* (heuristic) detections, as opposed to a signature for real malware (which would carry a family name like `W32.Sality` or `Trojan:Win32/...`). What feeds the heuristic in this case: the exe is **unsigned** (no code-signing certificate yet), the portable build is a self-extracting archive with a bundled Electron runtime, and the app spawns a local PowerShell process for Windows OCR and captures a screen region — exactly the behaviors those engines like to watch. The tells that it's a false positive: 1-2 of ~70 engines flagging it, the code above is the entire app (read it or build it yourself), and it talks to no network endpoint beyond the ones listed. If your AV or a new VirusTotal scan shows something different from that pattern, please open an issue — and consider holding off on running the file until it's looked at. I'm working toward code-signing the releases, which removes most of these flags at the source.
+**"Wait, my antivirus flagged it?"** — that happens, and it's worth understanding. A single engine (so far: McAfee) reports a detection like `Ti!89ED4493BBF4`. That name is **not a known virus** — it's the first 12 characters of the file's own SHA-256, which is how McAfee labels its *generic behavioral* (heuristic) detections, as opposed to a signature for real malware (which would carry a family name like `W32.Sality` or `Trojan:Win32/...`). What feeds the heuristic in this case: the exe is **unsigned** (no code-signing certificate yet), the portable build is a self-extracting archive with a bundled Electron runtime, and the app spawns a local PowerShell process for Windows OCR, captures a screen region and draws an always-on-top overlay — exactly the behaviors those engines like to watch. The tells that it's a false positive: 1-2 of ~70 engines flagging it, the code above is the entire app (read it or build it yourself), and it talks to no network endpoint beyond the ones listed. If your AV or a new VirusTotal scan shows something different from that pattern, please open an issue — and consider holding off on running the file until it's looked at. I'm working toward code-signing the releases, which removes most of these flags at the source.
 
 ## Troubleshooting
 
 - **Garbled text / nothing matches** → wrong or missing OCR language (see above). The Debug window shows exactly what OCR read.
 - **Some drops missing** → make sure the region covers the whole list, the panel isn't covered by chat or another window, and in-game UI scale is normal.
+- **Overlay doesn't show** → the game must be in **borderless windowed** mode; exclusive fullscreen hides overlays. Also leave some free space to the right of the region, since that's where the overlay is drawn.
 - **Wrong price** → poe.ninja has no data for that item, or it's a level-specific uncut gem (the app deliberately won't guess). Prices are always the current exchange value, not a fixed "base".
 - **Rate-limited by poe.ninja** → the app respects their ~5 min cache and refreshes at most every 30 min; if you spam Refresh, you'll hit their limits.
 - **Multi-monitor** → select the region on the monitor where the panel actually is; the app binds the capture to that display.
