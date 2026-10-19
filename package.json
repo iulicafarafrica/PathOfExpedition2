@@ -1,6 +1,6 @@
 {
   "name": "path-of-expedition",
-  "version": "1.0.8",
+  "version": "1.0.11",
   "private": true,
   "description": "PoE2 Expedition Runeshape price checker",
   "main": "main.js",
@@ -25,6 +25,7 @@
       "node_modules/**/*"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": ["portable", "nsis"]
     },
     "nsis": {

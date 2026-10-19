@@ -76,7 +76,7 @@ There is no Tesseract, no Python, no neural model downloaded on first run. The a
 Per scan, the pipeline is:
 
 1. **Capture** — Electron's `desktopCapturer` grabs the full screen at native resolution, the saved region is cropped out (with DPI scaling applied), and the crop is written to a temp PNG.
-2. **Recognize** — a small bundled PowerShell script (`ocr.ps1`) loads the PNG through the WinRT imaging stack and runs `OcrEngine.RecognizeAsync`. The engine is created from your Windows profile languages (`TryCreateFromUserProfileLanguages`), so it uses whatever OCR language you have installed. It returns each line's text plus its x/y position, as JSON.
+2. **Recognize** — a small bundled PowerShell script (`ocr.ps1`) loads the PNG through the WinRT imaging stack and runs `OcrEngine.RecognizeAsync`. The engine is created for **English** first (item names are English), falling back to your Windows profile languages if the English OCR pack isn't installed. It returns each line's text plus its x/y position, as JSON.
 3. **Parse** — the main process groups lines into reward rows (name + `Nx` quantity), filters out noise, and matches them against the price cache.
 
 Everything runs locally on your machine; no screenshot or text ever leaves it.

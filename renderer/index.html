@@ -92,7 +92,19 @@
   }
   .footer a { color:var(--gold); text-decoration:none; font-weight:bold; cursor:pointer; }
   .footer a:hover { text-decoration:underline; }
-  .priceline { font-size:11px; color:var(--ink-soft); text-align:right; font-style:italic; }
+  /* linkul de donatie: iese in evidenta (pastila cafea), nu doar text auriu */
+  .footer a#bmc {
+    color:#fff3e0;
+    background:linear-gradient(#cf8f3e, #a8661e);
+    border:1px solid #6d4114; border-radius:4px;
+    padding:2px 9px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.25);
+    text-shadow:0 1px 1px rgba(0,0,0,.35);
+  }
+  .footer a#bmc:hover { background:linear-gradient(#dd9f4e, #b8761e); text-decoration:none; }
+  .hk { font-size:10px; color:var(--ink-soft); text-align:center; padding:3px 0 0; line-height:1.5; }
+  .hk b { color:var(--ink); font-weight:bold; }
+  .priceline { color:var(--ink-soft); }
   .upd-banner {
     text-align:center; font-size:12px; font-weight:bold; cursor:pointer;
     color:#7a1f1f; background:linear-gradient(#f0d9b0, #e6c896);
@@ -121,6 +133,7 @@
     <button id="sel">Select region</button>
     <button id="ovl">Overlay: OFF</button>
     <button id="snd">Alert: OFF</button>
+    <button id="nm">Names: ON</button>
     <button id="scan">Scan now</button>
     <button id="ref">Refresh prices</button>
     <button id="chk">Check OCR</button>
@@ -131,9 +144,9 @@
   <div id="status" class="status">Loading…</div>
   <div id="list" class="list"><div class="empty">No prices yet.</div></div>
   <div class="spacer"></div>
-  <div id="pricesTime" class="priceline">Prices updated: —</div>
+  <div class="hk"><b>Ctrl+Alt+O</b> overlay · <b>Ctrl+Alt+R</b> rescan · <b>Ctrl+Alt+C</b> copy price · <b>Ctrl+Alt+T</b> item page</div>
   <div class="footer">
-    <span>made by iulian.icb · <span id="ver">v—</span></span>
+    <span>made by iulian.icb · <span id="ver">v—</span> · <span id="pricesTime" class="priceline">Prices updated: —</span></span>
     <a id="bmc">☕ Buy me a coffee</a>
   </div>
 </div>
@@ -144,15 +157,18 @@ const leagueEl = document.getElementById("league");
 const pricesTimeEl = document.getElementById("pricesTime");
 const ovlBtn = document.getElementById("ovl");
 const sndBtn = document.getElementById("snd");
+const nmBtn = document.getElementById("nm");
 const minvalEl = document.getElementById("minval");
 let overlayOn = false;
 let soundOn = false;
+let namesOn = true;   // numele itemului in overlay (false = ascuns)
 let minDiv = 0;      // prag de afisare (in Divine); 0 = arata tot
 let curRows = [];
 // prag pt "market mover": variatie pe 7 zile peste care marcăm itemul ca pump
 const PUMP_PCT = 15;
 function setOvlBtn(on) { overlayOn = on; ovlBtn.textContent = "Overlay: " + (on ? "ON" : "OFF"); ovlBtn.classList.toggle("on", on); }
 function setSndBtn(on) { soundOn = on; sndBtn.textContent = "Alert: " + (on ? "ON" : "OFF"); sndBtn.classList.toggle("on", on); }
+function setNmBtn(on) { namesOn = on; nmBtn.textContent = "Names: " + (on ? "ON" : "OFF"); nmBtn.classList.toggle("on", on); }
 
 // chime scurt (doua tonuri) prin Web Audio - fara fisiere de sunet
 let audioCtx = null;
@@ -257,6 +273,7 @@ async function boot() {
   setPricesTime(cfg.pricesAt, cfg.pricesStale);
   setOvlBtn(!!cfg.overlay);
   setSndBtn(!!cfg.soundAlert);
+  setNmBtn(!cfg.hideNames);
   minDiv = cfg.minDivine || 0;
   minvalEl.value = String(minDiv);
   document.getElementById("ver").textContent = "v" + (cfg.version || "?");
@@ -290,6 +307,15 @@ sndBtn.onclick = async () => {
     statusEl.textContent = r.on
       ? "Sound alert on — a chime plays when a new item is 1 Divine or more."
       : "Sound alert off.";
+  }
+};
+nmBtn.onclick = async () => {
+  const r = await window.api.setHideNames(namesOn);   // namesOn=true -> ascunde numele
+  if (r && r.ok) {
+    setNmBtn(!r.hideNames);
+    statusEl.textContent = r.hideNames
+      ? "Overlay now shows prices only (names hidden)."
+      : "Overlay shows item names again.";
   }
 };
 minvalEl.onchange = async () => {
@@ -383,6 +409,13 @@ window.api.onAlert((d) => {
   statusEl.textContent = n > 1
     ? `Alert: ${n} new items worth 1 Divine or more.`
     : "Alert: new item worth 1 Divine or more.";
+});
+
+// overlay pornit/oprit din hotkey global (Ctrl+Alt+O): sincronizam butonul din UI
+window.api.onOverlayState((on) => {
+  setOvlBtn(on);
+  render(curRows, null);
+  statusEl.textContent = on ? "Overlay on (hotkey)." : "Overlay off (hotkey).";
 });
 
 boot();

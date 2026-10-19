@@ -11,10 +11,23 @@ function AwaitWinRt([object]$a, [type]$t) {
   return $task.Result
 }
 $null = [Windows.Media.Ocr.OcrEngine,Windows.Media.Ocr,ContentType=WindowsRuntime]
+$null = [Windows.Globalization.Language,Windows.Globalization,ContentType=WindowsRuntime]
 $null = [Windows.Storage.StorageFile,Windows.Storage,ContentType=WindowsRuntime]
 $null = [Windows.Graphics.Imaging.BitmapDecoder,Windows.Graphics.Imaging,ContentType=WindowsRuntime]
 $null = [Windows.Graphics.Imaging.SoftwareBitmap,Windows.Graphics.Imaging,ContentType=WindowsRuntime]
-$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+# App-ul este doar in engleza, deci vrem explicit motorul OCR englez: pe un Windows
+# cu alta limba de afisare (fr/de/...), TryCreateFromUserProfileLanguages alege motorul
+# acelei limbi (citeste gresit textul englez) sau da NULL daca pachetul OCR de profil
+# lipseste. Fallback: limbile de profil, apoi orice limba OCR instalata.
+$engine = $null
+try { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language "en-US")) } catch {}
+if ($null -eq $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+if ($null -eq $engine) {
+  try {
+    $avail = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages
+    if ($avail.Count -gt 0) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($avail[0]) }
+  } catch {}
+}
 if ($null -eq $engine) { Write-Error "No OCR engine"; exit 1 }
 while ($null -ne ($line = [Console]::In.ReadLine())) {
   $p = $line.Trim()

@@ -12,10 +12,12 @@ contextBridge.exposeInMainWorld("api", {
   scanNow: () => ipcRenderer.invoke("scan-now"),
   toggleOverlay: (on) => ipcRenderer.invoke("toggle-overlay", on),
   setSoundAlert: (on) => ipcRenderer.invoke("set-sound-alert", on),
+  setHideNames: (on) => ipcRenderer.invoke("set-hide-names", on),
   setMinValue: (v) => ipcRenderer.invoke("set-min-value", v),
   selectRegion: () => ipcRenderer.invoke("select-region"),
   refreshPrices: () => ipcRenderer.invoke("refresh-prices"),
   onScan: (cb) => ipcRenderer.on("scan", (_e, data) => cb(data)),
   onAlert: (cb) => ipcRenderer.on("alert", (_e, data) => cb(data)),
+  onOverlayState: (cb) => ipcRenderer.on("overlay-state", (_e, on) => cb(on)),
   sendRegion: (region) => ipcRenderer.send("region-selected", region),
 });

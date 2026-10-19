@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, nativeImage, shell, globalShortcut, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -64,10 +64,23 @@ function AwaitWinRt([object]$a, [type]$t) {
   return $task.Result
 }
 $null = [Windows.Media.Ocr.OcrEngine,Windows.Media.Ocr,ContentType=WindowsRuntime]
+$null = [Windows.Globalization.Language,Windows.Globalization,ContentType=WindowsRuntime]
 $null = [Windows.Storage.StorageFile,Windows.Storage,ContentType=WindowsRuntime]
 $null = [Windows.Graphics.Imaging.BitmapDecoder,Windows.Graphics.Imaging,ContentType=WindowsRuntime]
 $null = [Windows.Graphics.Imaging.SoftwareBitmap,Windows.Graphics.Imaging,ContentType=WindowsRuntime]
-$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+# App-ul este doar in engleza, deci vrem explicit motorul OCR englez: pe un Windows
+# cu alta limba de afisare (fr/de/...), TryCreateFromUserProfileLanguages alege motorul
+# acelei limbi (citeste gresit textul englez) sau da NULL daca pachetul OCR de profil
+# lipseste. Fallback: limbile de profil, apoi orice limba OCR instalata.
+$engine = $null
+try { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language "en-US")) } catch {}
+if ($null -eq $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+if ($null -eq $engine) {
+  try {
+    $avail = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages
+    if ($avail.Count -gt 0) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($avail[0]) }
+  } catch {}
+}
 if ($null -eq $engine) { Write-Error "No OCR engine"; exit 1 }
 while ($null -ne ($line = [Console]::In.ReadLine())) {
   $p = $line.Trim()
@@ -634,7 +647,7 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 function loadConfig() {
-  const defaults = { league: "Forbidden Rites", region: null, overlay: false, soundAlert: false, minDivine: 0 };
+  const defaults = { league: "Forbidden Rites", region: null, overlay: false, soundAlert: false, minDivine: 0, hideNames: false };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
     log("loadConfig: citit", raw.length, "chari");
@@ -781,8 +794,9 @@ async function doScan(force) {
       // Pretul afisat = TOTALUL stack-ului; pentru qty>1 aratam si unitar.
       const total = p ? displayPrice(p.price * qty, "auto") : null;
       const unit = (p && qty > 1) ? displayPrice(p.price, "auto") : null;
+      // afisare ca in overlay: pret UNITAR, iar totalul stack-ului in paranteza cand sunt 2x+
       r.display = total
-        ? { value: total.value, currency: total.currency, text: total.text + (unit ? ` (${unit.text} each)` : "") }
+        ? { value: total.value, currency: total.currency, text: (unit ? unit.text : total.text) + (unit ? ` (${total.text})` : "") }
         : null;
       // pt overlay: pretul UNITAR principal, iar in paranteza TOTALUL doar daca qty>1
       const u = p ? displayPrice(p.price, "auto") : null;
@@ -878,21 +892,32 @@ function sendOverlay(r) {
   // PERFORMANTA: daca ce s-ar afisa e identic cu ultimul frame, nu mai trimitem
   // IPC si nu mai re-randam overlay-ul (malloc inutil). k intra in semnatura pt ca
   // pozitionarea barelor depinde de scale.
-  const sig = JSON.stringify([k, !!payload.pricesStale, config.minDivine,
+  const sig = JSON.stringify([k, !!payload.pricesStale, config.minDivine, !!config.hideNames,
     (payload.rows || []).map((x) => [x.name, x.y, x.dispUnit, x.dispTotal, x.trend, x.trendPct, x.tier, x.icon])]);
   if (sig === lastOverlaySig) return;
   lastOverlaySig = sig;
-  // inaltimea ferestrei urmeaza intinderea randurilor (nu tot panoulul -> mai putin lag)
+  // inaltimea ferestrei urmeaza intinderea randurilor (nu tot panoulul -> mai putin lag);
+  // +110 DIP jos = loc pt legenda (sageti + grafic) fara sa acopere ultima bara
   const ys = (payload.rows || []).map((x) => x.y || 0);
-  const h = Math.min(1200, Math.max(140, Math.round((ys.length ? Math.max(...ys) : 0) / k) + 56));
+  const h = Math.min(1200, Math.max(140, Math.round((ys.length ? Math.max(...ys) : 0) / k) + 110));
   const b = overlayBounds();
   if (b && Math.abs(overlayWin.getBounds().height - h) > 12) overlayWin.setBounds({ ...b, height: h });
-  overlayWin.webContents.send("scan", { ...payload, scale: k, minDivine: config.minDivine });
+  overlayWin.webContents.send("scan", { ...payload, scale: k, minDivine: config.minDivine, hideNames: !!config.hideNames });
 }
 function broadcast(r) {
   if (r && !r.error) lastScanPayload = r;
   win?.webContents.send("scan", r);
   sendOverlay(r);
+}
+// randul cu cea mai mare valoare din ultimul scan (pt hotkey-urile copy/open)
+function topRow() {
+  const rows = (lastScanPayload && lastScanPayload.rows) || lastRows || [];
+  let best = null;
+  for (const r of rows) {
+    if (!r) continue;
+    if (!best || (r.totalDivine || 0) > (best.totalDivine || 0)) best = r;
+  }
+  return best;
 }
 function toggleOverlay(on) {
   if (on !== true) {
@@ -990,16 +1015,19 @@ function poeNinjaItemUrl(league, category, name) {
   if (!ls || !cs || !ns) return null;
   return `https://poe.ninja/poe2/economy/${ls}/${cs}/${ns}`;
 }
-// click pe un rand -> pagina itemului; URL-ul e construit in main din componente
-// validate (rendererul nu poate injecta un URL arbitrar).
-ipcMain.handle("open-item", (_e, r) => {
+// pagina itemului pe poe.ninja (volum, istoric de pret); URL-ul e construit in main
+// din componente validate (rendererul nu poate injecta un URL arbitrar).
+function openItemPage(r) {
   const league = r && AVAILABLE_LEAGUES.includes(r.league) ? r.league : config.league;
   const category = r && NINJA_TYPES.includes(r.category) ? r.category : null;
-  const name = r && typeof r.name === "string" && nameSlug(r.name) ? r.name : null;
+  const raw = r ? (r.matchedName || r.name) : null;   // numele din API (nu textul OCR)
+  const name = typeof raw === "string" && nameSlug(raw) ? raw : null;
   const url = category && name ? poeNinjaItemUrl(league, category, name) : null;
   if (url && EXTERNAL_ALLOW.some((re) => re.test(url))) shell.openExternal(url);
   return url;
-});
+}
+// click pe un rand -> pagina itemului
+ipcMain.handle("open-item", (_e, r) => openItemPage(r));
 // buffer de debug: loguri + liniile OCR brute din ultimul scan
 ipcMain.handle("get-debug", () => ({
   logs: logLines.slice(),
@@ -1062,6 +1090,14 @@ ipcMain.handle("set-min-value", (_e, v) => {
   sendOverlay(lastScanPayload);   // re-trimite catre overlay ca sa aplice filtrul
   return { ok: true, minDivine: config.minDivine };
 });
+// numele itemului in overlay: redundant cand panoul din joc il arata deja la stanga,
+// deci poate fi ascuns (ramane doar pretul + trend). Doar boolean, persistat.
+ipcMain.handle("set-hide-names", (_e, on) => {
+  config.hideNames = on === true;
+  saveConfig();
+  sendOverlay(lastScanPayload);   // re-trimite catre overlay ca sa aplice schimbarea
+  return { ok: true, hideNames: config.hideNames };
+});
 
 ipcMain.handle("select-region", async () => {
   selectOpen = true;   // nu fac scan cat timp box-ul e deschis
@@ -1114,6 +1150,55 @@ ipcMain.handle("select-region", async () => {
   });
 });
 
+// ---------- hotkeys globale (functioneaza si cand jocul e in focus) ----------
+// Ctrl+Alt+O: overlay on/off | Ctrl+Alt+R: rescan | Ctrl+Alt+C: copiaza pretul
+// itemului cel mai valoros de pe ecran | Ctrl+Alt+T: deschide pagina itemului (poe.ninja).
+const HOTKEYS = [
+  ["Control+Alt+O", "overlay"],
+  ["Control+Alt+R", "rescan"],
+  ["Control+Alt+C", "copy-price"],
+  ["Control+Alt+T", "open-item"],
+];
+function notifyOverlayState() {
+  if (win && !win.isDestroyed()) win.webContents.send("overlay-state", config.overlay === true);
+}
+function copyTopPrice() {
+  const r = topRow();
+  if (!r) { log("hotkey copy: nimic de copiat"); return null; }
+  const name = r.matchedName || r.name;
+  const qty = r.qty || 1;
+  const price = (r.display && r.display.text) || r.dispTotal || r.dispUnit || "?";
+  const text = `${qty}x ${name} — ${price}`;
+  clipboard.writeText(text);
+  log("hotkey copy:", text);
+  return text;
+}
+function registerHotkeys() {
+  for (const [accel, action] of HOTKEYS) {
+    let ok = false;
+    try {
+      ok = globalShortcut.register(accel, () => {
+        try {
+          if (action === "overlay") {
+            const res = toggleOverlay(!(overlayWin && !overlayWin.isDestroyed()));
+            notifyOverlayState();
+            log("hotkey overlay ->", res.on);
+          } else if (action === "rescan") {
+            log("hotkey rescan"); runScan(true);
+          } else if (action === "copy-price") {
+            copyTopPrice();
+          } else if (action === "open-item") {
+            const r = topRow();
+            if (r) openItemPage(r);
+          }
+        } catch (e) { log("hotkey error", action, e.message || e); }
+      });
+    } catch (e) { log("hotkey: eroare la inregistrare", accel, e.message || e); }
+    if (!ok) log("hotkey: nu pot inregistra", accel, "(probabil ocupat de alta aplicatie)");
+    else log("hotkey inregistrat:", accel, "->", action);
+  }
+}
+
 // securitate: aplicația e doar local - blocam navigarea externa si crearea de ferestre
 app.on("web-contents-created", (_e, contents) => {
   contents.on("will-navigate", (event) => event.preventDefault());
@@ -1122,6 +1207,7 @@ app.on("web-contents-created", (_e, contents) => {
 
 app.whenReady().then(async () => {
   createWindow();
+  registerHotkeys();   // Ctrl+Alt+O/R/C/T (functioneaza si peste joc)
   // incarca preturile la pornire (nu blocheaza UI)
   try { await fetchPrices(config.league || "Forbidden Rites"); } catch {}
   // daca regiunea e deja salvata, porneste scanarea automata (fara buton Start)
@@ -1143,6 +1229,7 @@ app.whenReady().then(async () => {
   }, 5 * 60 * 1000);
 });
 app.on("window-all-closed", () => app.quit());
+app.on("will-quit", () => { try { globalShortcut.unregisterAll(); } catch {} });
 
 // prinde erorile nemanagite ca sa vedem exact unde e bug-ul
 process.on("uncaughtException", (e) => {
