@@ -122,6 +122,14 @@ Turn **Overlay** on and prices are drawn over the game, lined up with each rewar
 
 The app bundles an offline database of **all 33 runes** (tier, monster danger, spread behavior) and **all 322 Runeshape combinations**.
 
+<div align="center">
+
+![Rune Planner tab](screenshot-rune-planner.png)
+
+*Pick your runes and see the exact recipe, what it can extend to, spread advice and the jackpots to chase.*
+
+</div>
+
 **Rune Planner tab.** Pick the runes you're looking at (click the chips, or **Read from screen** to detect them automatically):
 
 | Section | What you get |
@@ -137,11 +145,27 @@ The app bundles an offline database of **all 33 runes** (tier, monster danger, s
 
 Click a rune name in the planner to jump straight to its combinations.
 
+<div align="center">
+
+![All Combos tab](screenshot-all-combos.png)
+
+*All 322 combinations with category, danger level and live price.*
+
+</div>
+
 ---
 
 ## Rune overlay
 
 Box the rune panel once with **Set rune region**, then turn the overlay on. It's a separate click-through window (run it alongside the price overlay, on its own, or not at all) that sits right of the panel and **auto-detects the runes in each row** every couple of seconds, using image template matching. No OCR, no typing.
+
+<div align="center">
+
+![Rune overlay in game](screenshot-rune-overlay.jpeg)
+
+*The rune overlay next to the Runeshape panel: danger, reward, spread advice and chase progress for every row.*
+
+</div>
 
 For every row it shows:
 
