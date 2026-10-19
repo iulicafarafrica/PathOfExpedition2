@@ -46,18 +46,33 @@
     border-radius: 5px; padding: 3px 9px; white-space: nowrap; max-width: calc(100% - 4px);
     text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
   }
+  /* legenda de orientare: apare cand se porneste overlay-ul si dispare dupa 20s
+     (fara display in CSS ca sa nu copleseasca atributul hidden, ca in overlay.html) */
+  #legend {
+    position: absolute; left: 0; top: 0; z-index: 5;
+    font-family: Georgia, "Times New Roman", serif; font-size: 10px; line-height: 1.45;
+    color: #cbbc92; background: rgba(6, 5, 4, .92); border: 1px solid rgba(214, 198, 156, .35);
+    border-radius: 5px; padding: 4px 8px; white-space: nowrap; max-width: calc(100% - 4px);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .95);
+  }
+  #legend b { color: #ead9a8; }
+  .ch { color: #f2c14e; }
 </style>
 </head>
 <body>
 <div id="rows"></div>
 <div id="hint" hidden></div>
+<div id="legend"><b>DANGER n/m</b> — monster danger of this row (higher = harder)<br><b>Spread → X</b> — keep 1 copy of X for later Remnants · <b>★</b> — jackpot / permanent Boon</div>
 <script src="runereader.js"></script>
 <script>
 const rowsEl = document.getElementById("rows");
 const hintEl = document.getElementById("hint");
+const legendEl = document.getElementById("legend");
 let byName = new Map();
 let byKey = new Map();   // cheie = rune sortate -> lista de retete posibile
 let chase = new Set();
+let chaseList = [];      // { name, set:Set(norm), total } pt progresul "3/9"
+const nn = (s) => String(s).toLowerCase().replace(/\s+rune$/, "");
 let running = false;
 let lastPaint = "";
 // cand panoul din joc e inchis (fara randuri), hint-ul ramane afisat doar cateva
@@ -68,7 +83,12 @@ const NO_ROWS_HINT_MS = 5000;
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function short(n) { return String(n).replace(/\s*Rune$/i, ""); }
 function key(names) { return names.slice().sort().join("|"); }
-function showHint(msg) { hintEl.hidden = false; hintEl.textContent = msg; }
+function showHint(msg) {
+  hintEl.hidden = false;
+  hintEl.textContent = msg;
+  // nu suprapune hint-ul peste legenda de orientare (ambele sunt sus, la pornire)
+  hintEl.style.top = legendEl.hidden ? "0" : "48px";
+}
 
 function rowHtml(det, y) {
   let sum = 0, max = 0;
@@ -80,7 +100,8 @@ function rowHtml(det, y) {
     if (info && info.propagate === "good") good.push(info);
     else if (info && info.propagate === "bad") bad.push(info);
   }
-  const dgr = `<span class="dgr d${Math.max(1, Math.min(6, max))}" title="Monster danger (sum ${sum}, max ${max})">DANGER ${sum}</span>`;
+  // n/m = suma din maximul acestui rand (nr. rune x 5) - ca sa se vada scala
+  const dgr = `<span class="dgr d${Math.max(1, Math.min(6, max))}" title="Monster danger (sum ${sum}, max ${max})">DANGER ${sum}/${det.length * 5}</span>`;
 
   const list = byKey.get(key(det.map((d) => d.name))) || [];
   let rw;
@@ -94,16 +115,31 @@ function rowHtml(det, y) {
     rw = `<b class="rw unk">unknown combination</b>`;
   }
 
+  // progres catre un jackpot/boon: cate rune din setul necesar sunt in acest rand
+  let chaseLine = "";
+  if (chaseList.length) {
+    const detSet = new Set(det.map((d) => nn(d.name)));
+    let best = null;
+    for (const c of chaseList) {
+      let cnt = 0;
+      for (const n of detSet) if (c.set.has(n)) cnt++;
+      if (cnt > 0 && (!best || cnt > best.cnt)) best = { name: c.name, cnt, total: c.total };
+    }
+    if (best && best.cnt < best.total) {
+      chaseLine = `<span class="sub ch">\u2192 ${esc(best.name)} ${best.cnt}/${best.total}</span>`;
+    }
+  }
+
   let sub;
   if (good.length) {
     const g = good.map((x) => esc(short(x.name)) + (x.tier ? " (" + x.tier + ")" : "")).join(", ");
-    sub = `<span class="sub sp">Spread \u2192 ${g} \u00b7 carry a copy into later Remnants</span>`;
+    sub = `<span class="sub sp">Spread \u2192 ${g} \u00b7 keep 1 copy for later Remnants</span>`;
   } else if (bad.length) {
-    sub = `<span class="sub av">Don't carry forward: ${esc(bad.map((x) => short(x.name)).join(", "))}</span>`;
+    sub = `<span class="sub av">Don't spread ${esc(bad.map((x) => short(x.name)).join(", "))} \u00b7 drop it from the next row</span>`;
   } else {
-    sub = `<span class="sub muted">No rune here is worth spreading \u2014 safe to pick any</span>`;
+    sub = `<span class="sub muted">No spread needed \u00b7 pick any</span>`;
   }
-  return `<div class="r" style="top:${y}px">${dgr}<span class="txt">${rw}${sub}</span></div>`;
+  return `<div class="r" style="top:${y}px">${dgr}<span class="txt">${rw}${sub}${chaseLine}</span></div>`;
 }
 
 async function tick() {
@@ -114,7 +150,16 @@ async function tick() {
     if (!cap || !cap.ok) { rowsEl.innerHTML = ""; lastPaint = ""; showHint((cap && cap.error) || "Set the rune region first."); return; }
     const rows = await RuneReader.detectRows(cap.dataUrl, cap.scale);
     const good = rows.filter((r) => r.det.length >= 2 && Math.max(...r.det.map((d) => d.sc)) >= 0.4);
-    if (!good.length) { rowsEl.innerHTML = ""; lastPaint = ""; showHint("No rune rows detected \u2014 box the panel (or ONE row) again."); return; }
+    if (!good.length) {
+      rowsEl.innerHTML = ""; lastPaint = "";
+      // hint de orientare doar cateva secunde de la stare (panoul inchis nu mai
+      // lasa text ramas pe ecran)
+      if (!noRowsSince) noRowsSince = Date.now();
+      if (Date.now() - noRowsSince < NO_ROWS_HINT_MS) showHint("No rune rows detected \u2014 box the panel (or ONE row) again.");
+      else hintEl.hidden = true;
+      return;
+    }
+    noRowsSince = 0;
     hintEl.hidden = true;
     const k = cap.scale > 0 ? cap.scale : 1;
     const html = good.map((r) => rowHtml(r.det, Math.max(0, Math.round(r.cy / k) - 17))).join("");
@@ -136,9 +181,15 @@ async function tick() {
         byKey.get(k).push(rec);
       }
       chase = new Set((d.chase || []).map((c) => c.reward.toLowerCase()));
+      for (const c of d.chase || []) {
+        const set = new Set((c.runes || []).map(nn));
+        if (set.size) chaseList.push({ name: c.reward, set, total: set.size });
+      }
       await RuneReader.init(d.runes);
     }
   } catch {}
+  // legenda de orientare: vizibila la pornire, apoi dispare singura
+  setTimeout(() => { legendEl.hidden = true; }, 20000);
   tick();
   setInterval(tick, 2000);
 })();
