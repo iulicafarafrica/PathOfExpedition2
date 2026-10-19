@@ -103,6 +103,18 @@
     return best;
   }
 
+  // Un rand e "real" (panoul Runeshape) doar cand are macar o rune cu match
+  // puternic SI o a doua decenta. Pe panoul real, fiecare rand are cel putin o
+  // rune cu NCC >= ~0.70; pamantul/obiectele raman sub acesti praguri, asa ca
+  // filtrul astea impiedica false-positives (cand panoul e inchis si in box
+  // se vede pamantul/harta).
+  const CONF = 0.6, CONF2 = 0.5;
+  function rowOk(det) {
+    if (!det || det.length < 2) return false;
+    const s = det.map((d) => d.sc);
+    return Math.max.apply(null, s) >= CONF && s.filter((x) => x >= CONF2).length >= 2;
+  }
+
   async function detectRows(dataUrl, k) {
     k = k > 0 ? k : 1;
     const img = await loadImg(dataUrl);
@@ -143,17 +155,20 @@
       r.cells.sort((a, b) => a.minx - b.minx);
       const det = [];
       for (const cc of r.cells) { const m = classifyCell(g, W, H, cc); if (m) det.push(m); }
-      out.push({ cy: r.cy, n: r.cells.length, det });
+      out.push({ cy: r.cy, n: r.cells.length, det, ok: rowOk(det) });
     }
     return out;
   }
 
   async function detect(dataUrl, k) {
     const rows = await detectRows(dataUrl, k);
-    if (!rows.length) return { det: [], rows: 0, sizes: [] };
-    let best = rows[0];
-    for (const r of rows) if (r.det.length > best.det.length) best = r;
-    return { det: best.det, rows: rows.length, sizes: rows.map((r) => r.n), cy: best.cy };
+    if (!rows.length) return { det: [], rows: 0, sizes: [], ok: false };
+    const pick = (arr) => { let b = arr[0]; for (const r of arr) if (r.det.length > b.det.length) b = r; return b; };
+    const okRows = rows.filter((r) => r.ok);
+    // preferam un rand cu incredere mare; daca nu e niciunul, intoarcem totusi
+    // cel mai plin ca sa poata fi raportat/verificat manual (nu e "ok").
+    const best = okRows.length ? pick(okRows) : pick(rows);
+    return { det: best.det, rows: rows.length, sizes: rows.map((r) => r.n), cy: best.cy, ok: best.ok };
   }
 
   window.RuneReader = { init, ready, detect, detectRows };

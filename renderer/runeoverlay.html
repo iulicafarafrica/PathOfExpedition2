@@ -149,7 +149,9 @@ async function tick() {
     const cap = await window.api.captureRunes();
     if (!cap || !cap.ok) { rowsEl.innerHTML = ""; lastPaint = ""; showHint((cap && cap.error) || "Set the rune region first."); return; }
     const rows = await RuneReader.detectRows(cap.dataUrl, cap.scale);
-    const good = rows.filter((r) => r.det.length >= 2 && Math.max(...r.det.map((d) => d.sc)) >= 0.4);
+    // doar randuri cu incredere mare (panoul Runeshape deschis); pamantul/obiectele
+    // raman sub prag si nu mai apar ca randuri de rune.
+    const good = rows.filter((r) => r.ok);
     if (!good.length) {
       rowsEl.innerHTML = ""; lastPaint = "";
       // hint de orientare doar cateva secunde de la stare (panoul inchis nu mai

@@ -1324,6 +1324,8 @@ app.whenReady().then(async () => {
   if (config.region) startPoll();
   // repune overlay-ul daca era pornit la ultima rulare
   if (config.overlay) toggleOverlay(true);
+  // si overlay-ul de rune (ca peste buton sa fie mereu ON/OFF corect cu fereastra)
+  if (config.runeOverlay && config.runeRegion) toggleRuneOverlay(true);
   // auto-refresh preturi la 30 min
   setInterval(async () => {
     try {

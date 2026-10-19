@@ -676,6 +676,12 @@ document.getElementById("rdRunes").onclick = async () => {
     const res = await RuneReader.detect(r.dataUrl, r.scale);
     const det = res.det;
     if (!det.length) { plStatusEl.textContent = "No runes detected — check the rune region."; return; }
+    // rand fara incredere mare = probabil pamant/obiecte, nu panoul Runeshape:
+    // nu importam nimic, doar spunem ce a vazut si de ce.
+    if (!res.ok) {
+      plStatusEl.textContent = "That looks like ground/objects, not the rune panel (low confidence) — nothing imported. Box ONE row of the Runeshape Combinations panel and retry.";
+      return;
+    }
     runeCounts.clear();
     let low = 0;
     for (const dm of det) { if (plannerRunes.some((x) => x.name === dm.name)) bumpRune(dm.name, 1); if (dm.sc < 0.45) low++; }
