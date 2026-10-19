@@ -4,7 +4,7 @@
 
 *The in-game overlay: live poe.ninja prices drawn straight over your Runeshape panel.*
 
-A small Windows desktop app for Path of Exile 2. It reads the Expedition reward panel from your screen and tells you what those drops are actually worth, using live prices from poe.ninja — right over the game, in a click-through in-game overlay, or in a compact window.
+A small Windows desktop app for Path of Exile 2. It reads the Expedition reward panel from your screen and tells you what those drops are actually worth, using live prices from poe.ninja — right over the game, in a click-through in-game overlay, or in a compact window. It also ships with the full Runeshape rune database (all 33 runes, all 322 combinations): a **Rune Planner** that does the combo math for you, and a second in-game overlay that reads the runes themselves and tells you what to keep and what to chase.
 
 ![The app window](screenshot-window.png)
 
@@ -32,6 +32,9 @@ Your region and league are saved, so the next time you launch it just picks up w
 
 | Feature | What it does |
 | --- | --- |
+| Rune Planner | A tab that does the Runeshape math for you. Pick the runes you're holding (or **Read from screen** to detect them automatically) and it shows the **exact recipe** (with live price and a monster-DANGER badge), every combo that combination **can extend to**, and **spread advice** — which rune is worth carrying a copy of into later Remnants and which to drop. See [Rune Planner](#rune-planner--all-combos). |
+| All Combos | Browse the entire built-in database of **322 Runeshape combinations** — search by rune or reward, filter by category (Alloys, Currency, Gems, Runes, Uniques). See [Rune Planner](#rune-planner--all-combos). |
+| In-game rune overlay | A second, separate click-through overlay that sits beside the Runeshape rune panel and **auto-detects the runes in each row** (no typing, no OCR). For every row it shows the DANGER level, the reward, what to spread, and how close that row gets you to a jackpot. See [In-game rune overlay](#in-game-rune-overlay). |
 | In-game overlay | Prices are drawn over the game, aligned with each item row — no alt-tabbing. It's a transparent, **click-through** window: the game keeps all your mouse input and there's **no added lag**, and it only covers as much screen as the text needs. Toggle with **Overlay**. |
 | Sound alert | A short chime plays when a new item worth **1 Divine or more** appears. Toggle with **Alert** — it's remembered between sessions and rings only once per new item. |
 | Region capture | You frame the part of the screen that matters (the reward list). It works on multi-monitor setups and handles DPI scaling, so 125%/150% displays are fine. |
@@ -69,6 +72,32 @@ Notes:
 - You can screenshot and record the overlay normally (Snipping Tool, Print Screen, OBS).
 - The overlay sits just to the **right** of the region you selected, so pick a region with a bit of free space to its right.
 
+## Rune Planner & All Combos
+
+The app bundles a complete, offline database of **all 33 runes** (tier, monster danger, spread behavior) and **all 322 Runeshape combinations**, so the decision-making can be done for you:
+
+- **Rune Planner tab** — pick the runes you're looking at (click the chips, or press **Read from screen** and the app detects them from the panel automatically). You get:
+  - **Exact recipe** — what your current runes produce right now, with live poe.ninja prices, a **DANGER** badge (monster danger of the combo) and a **BOON** badge on permanent-boon combos;
+  - **Can extend to** — every bigger combination your runes can still grow into, so you know what to keep chasing;
+  - **Spread advice** — only gold-bordered runes propagate to later Remnants, and not all of them are worth it. The planner tells you which of your runes to carry a copy of forward (*Spread: Power, Opulent*) and which to avoid (*Don't carry forward: Life*);
+  - **Chase** — the jackpots and permanent boons worth going for (**Mirror of Kalandra, 10× Divine Orb, the four Boons**), with a live check on whether your current runes are already **on track** for any of them.
+- **All Combos tab** — the entire 322-combination database, searchable by rune name or reward, with category filters: **Alloys (14) · Currency (93) · Gems (61) · Runes (131) · Uniques (23)**. Click a rune name in the planner to jump straight to its combinations.
+
+## In-game rune overlay
+
+Toggle it from the Rune Planner tab: box the rune panel once with **Set rune region**, then turn the overlay on. It's a separate, transparent, **click-through** window (independent from the price overlay — run both, either one, or neither) that sits to the right of the panel and, every couple of seconds, **auto-detects the runes in each row** using image template matching — no OCR, no typing. For every row it shows:
+
+- a **DANGER n/m** badge — the row's monster-danger sum out of the row's maximum (higher = harder monsters);
+- the **reward** — or an honest *"N possible results"* when the combination is ambiguous — with a **★** on jackpots and permanent boons;
+- a one-line **spread** note (*"Spread → Oath (S) · keep 1 copy for later Remnants"*, *"Don't spread Life · drop it from the next row"*);
+- **chase progress** — a gold line like *"→ Mirror of Kalandra 3/9"* when the row's runes count toward a jackpot or boon.
+
+Notes:
+
+- Like the price overlay, it needs **borderless windowed** mode and leaves free space to the right of the region.
+- A short orientation legend appears at the top for the first 20 seconds after you switch it on, then hides itself.
+- The region and on/off state are remembered and restored on launch.
+
 ## How the OCR works
 
 There is no Tesseract, no Python, no neural model downloaded on first run. The app uses **Windows' own OCR engine** — the `Windows.Media.Ocr` WinRT API, the same one behind "Copy text from image" in Windows Photos and the clipboard OCR.
@@ -91,7 +120,9 @@ If in-game text comes out garbled or items don't match, hit **Check OCR** in the
 
 - **Electron** — main process in Node.js (capture, OCR, prices, overlay, IPC), `contextIsolation` + sandboxed renderer, no remote code, navigation locked down.
 - **electron-builder** — ships as a portable `.exe` and an NSIS installer (x64).
-- **Vanilla HTML/CSS/JS** for the UI — two screens (main window + overlay), no framework, no build step for the renderer.
+- **Vanilla HTML/CSS/JS** for the UI — three screens (main window, price overlay, rune overlay), no framework, no build step for the renderer.
+- **Rune detection** — the rune overlay recognizes runes with pure **image template matching** (33 bundled rune sprites compared against the captured panel), so it needs no OCR at all.
+- **Bundled rune database** — `data/runes.json` (33 runes) + `data/recipes.json` (322 combinations, patch 0.5.5), loaded once at startup; the planner runs fully offline.
 - **WinRT OCR via PowerShell** (`System.Runtime.WindowsRuntime` → `Windows.Media.Ocr`, `Windows.Graphics.Imaging`) — Windows-native recognition, no external OCR dependency.
 - **Web Audio API** for the alert chime — generated in code, no sound files.
 - **poe.ninja exchange API** (`/poe2/api/economy/exchange/current/overview`) — same data their website displays; results normalized to per-1-Divine internally.
@@ -137,6 +168,7 @@ The executables land in `dist/`. `package-lock.json` pins the dependencies, so a
 - **Wrong price** → poe.ninja has no data for that item, or it's a level-specific uncut gem (the app deliberately won't guess). Prices are always the current exchange value, not a fixed "base".
 - **Rate-limited by poe.ninja** → the app respects their ~5 min cache and refreshes at most every 30 min; if you spam Refresh, you'll hit their limits.
 - **Multi-monitor** → select the region on the monitor where the panel actually is; the app binds the capture to that display.
+- **Rune overlay shows nothing / wrong runes** → re-box the region with **Set rune region** (the whole panel or a single row), keep the game in borderless windowed, and make sure the rune icons aren't covered by tooltips or chat. The "no rows detected" hint only appears for a few seconds on purpose.
 
 ## Support
 
