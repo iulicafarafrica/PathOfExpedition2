@@ -65,6 +65,9 @@
     border-radius: 5px; padding: 3px 9px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
   }
+  /* display:flex de mai sus (specificitate mai mare) copleseste display:none din
+     atributul [hidden] -> fara regula asta legenda nu se ascunde niciodata. */
+  #legend[hidden] { display: none; }
   #legend .lg { display: flex; align-items: center; gap: 5px; }
   #legend .up { color: #7ee08a; }
   #legend .down { color: #ff9090; }

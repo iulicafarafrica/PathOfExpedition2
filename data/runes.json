@@ -1,0 +1,576 @@
+[
+  {
+    "name": "Earth Rune",
+    "slug": "earth",
+    "sprite": "data/runes/rune-earth.webp",
+    "rare": true,
+    "combos": 45,
+    "effects": [
+      "Conjures Earthly Spires"
+    ],
+    "datamined": [
+      "Earth Rune](/art/expedition/rune-earth.webp \"Earth Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "B"
+  },
+  {
+    "name": "Sky Rune",
+    "slug": "sky",
+    "sprite": "data/runes/rune-sky.webp",
+    "rare": true,
+    "combos": 43,
+    "effects": [
+      "Conjures Elemental Tornados"
+    ],
+    "datamined": [
+      "Sky Rune](/art/expedition/rune-sky.webp \"Sky Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "B"
+  },
+  {
+    "name": "Soul Rune",
+    "slug": "soul",
+    "sprite": "data/runes/rune-soul.webp",
+    "rare": true,
+    "combos": 33,
+    "effects": [
+      "Union of Souls"
+    ],
+    "datamined": [
+      "Soul Rune](/art/expedition/rune-soul.webp \"Soul Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "A"
+  },
+  {
+    "name": "Ward Rune",
+    "slug": "ward",
+    "sprite": "data/runes/rune-ward.webp",
+    "rare": true,
+    "combos": 77,
+    "effects": [
+      "Protected by Runic Ward"
+    ],
+    "datamined": [
+      "Ward Rune](/art/expedition/rune-ward.webp \"Ward Rune\")",
+      "80% reduced Runic Ward Regeneration Rate"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "B"
+  },
+  {
+    "name": "Bond Rune",
+    "slug": "bond",
+    "sprite": "data/runes/rune-bond.webp",
+    "rare": true,
+    "combos": 33,
+    "effects": [
+      "Rare Monsters may transfer a Mod on death"
+    ],
+    "datamined": [
+      "Bond Rune](/art/expedition/rune-bond.webp \"Bond Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "good",
+    "tier": "S"
+  },
+  {
+    "name": "Death Rune",
+    "slug": "death",
+    "sprite": "data/runes/rune-death.webp",
+    "rare": true,
+    "combos": 28,
+    "effects": [
+      "Slain Monsters may merge into stronger Monsters"
+    ],
+    "datamined": [
+      "Death Rune](/art/expedition/rune-death.webp \"Death Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "good",
+    "tier": "S"
+  },
+  {
+    "name": "Life Rune",
+    "slug": "life",
+    "sprite": "data/runes/rune-life.webp",
+    "rare": true,
+    "combos": 34,
+    "effects": [
+      "Shared Life"
+    ],
+    "datamined": [
+      "Life Rune](/art/expedition/rune-life.webp \"Life Rune\")",
+      "80% reduced Life Regeneration rate"
+    ],
+    "danger": 4,
+    "propagate": "bad",
+    "tier": "B"
+  },
+  {
+    "name": "Oath Rune",
+    "slug": "oath",
+    "sprite": "data/runes/rune-oath.webp",
+    "rare": true,
+    "combos": 30,
+    "effects": [
+      "A Monster summons Allies"
+    ],
+    "datamined": [
+      "Oath Rune](/art/expedition/rune-oath.webp \"Oath Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "good",
+    "tier": "S"
+  },
+  {
+    "name": "Time Rune",
+    "slug": "time",
+    "sprite": "data/runes/rune-time.webp",
+    "rare": true,
+    "combos": 45,
+    "effects": [
+      "Slain Monsters may respawn as higher Rarity"
+    ],
+    "datamined": [
+      "Time Rune](/art/expedition/rune-time.webp \"Time Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "good",
+    "tier": "A"
+  },
+  {
+    "name": "Power Rune",
+    "slug": "power",
+    "sprite": "data/runes/rune-power.webp",
+    "rare": true,
+    "combos": 42,
+    "effects": [
+      "Empowered"
+    ],
+    "datamined": [
+      "Power Rune](/art/expedition/rune-power.webp \"Power Rune\")",
+      "Effects are the modifier a runic monster gets from the rune (Expedition2Runes → ArchnemesisMods), where the stat descriptions have text for it."
+    ],
+    "danger": 5,
+    "propagate": "good",
+    "tier": "S"
+  },
+  {
+    "name": "Wisdom Rune",
+    "slug": "wisdom",
+    "sprite": "data/runes/rune-wisdom.webp",
+    "rare": false,
+    "combos": 56,
+    "effects": [
+      "Increased Experience"
+    ],
+    "datamined": [
+      "Wisdom Rune](/art/expedition/rune-wisdom.webp \"Wisdom Rune\")"
+    ],
+    "danger": 1,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Cold Rune",
+    "slug": "cold",
+    "sprite": "data/runes/rune-cold.webp",
+    "rare": false,
+    "combos": 40,
+    "effects": [
+      "Extra Cold Damage"
+    ],
+    "datamined": [
+      "Cold Rune](/art/expedition/rune-cold.webp \"Cold Rune\")",
+      "Gain 10% of Damage as Extra Cold Damage"
+    ],
+    "danger": 2,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Fire Rune",
+    "slug": "fire",
+    "sprite": "data/runes/rune-fire.webp",
+    "rare": false,
+    "combos": 32,
+    "effects": [
+      "Extra Fire Damage"
+    ],
+    "datamined": [
+      "Fire Rune](/art/expedition/rune-fire.webp \"Fire Rune\")",
+      "Gain 10% of Damage as Extra Fire Damage"
+    ],
+    "danger": 2,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Lightning Rune",
+    "slug": "lightning",
+    "sprite": "data/runes/rune-lightning.webp",
+    "rare": false,
+    "combos": 33,
+    "effects": [
+      "Extra Lightning Damage"
+    ],
+    "datamined": [
+      "Lightning Rune](/art/expedition/rune-lightning.webp \"Lightning Rune\")",
+      "Gain 10% of Damage as Extra Lightning Damage"
+    ],
+    "danger": 2,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Opulent Rune",
+    "slug": "opulent",
+    "sprite": "data/runes/rune-opulent.webp",
+    "rare": false,
+    "combos": 33,
+    "effects": [
+      "Increases Monster Rarity"
+    ],
+    "datamined": [
+      "Opulent Rune](/art/expedition/rune-opulent.webp \"Opulent Rune\")"
+    ],
+    "danger": 2,
+    "propagate": "good",
+    "tier": "SS"
+  },
+  {
+    "name": "Vision Rune",
+    "slug": "vision",
+    "sprite": "data/runes/rune-vision.webp",
+    "rare": false,
+    "combos": 42,
+    "effects": [
+      "Reflect Curses",
+      "Chance to Reflect Shock",
+      "Chance to Reflect Chill"
+    ],
+    "datamined": [
+      "Vision Rune](/art/expedition/rune-vision.webp \"Vision Rune\")",
+      "Curse Reflection"
+    ],
+    "danger": 2,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Adaptive Rune",
+    "slug": "adaptive",
+    "sprite": "data/runes/rune-adaptive.webp",
+    "rare": false,
+    "combos": 48,
+    "effects": [
+      "Adaptation"
+    ],
+    "datamined": [
+      "Adaptive Rune](/art/expedition/rune-adaptive.webp \"Adaptive Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Arcane Rune",
+    "slug": "arcane",
+    "sprite": "data/runes/rune-arcane.webp",
+    "rare": false,
+    "combos": 48,
+    "effects": [
+      "Extra Energy Shield",
+      "Trigger a Stunning nova when Energy Shield is depleted"
+    ],
+    "datamined": [
+      "Arcane Rune](/art/expedition/rune-arcane.webp \"Arcane Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Electrocuting Rune",
+    "slug": "electrocuting",
+    "sprite": "data/runes/rune-electrocuting.webp",
+    "rare": false,
+    "combos": 36,
+    "effects": [
+      "Extra Lightning Damage",
+      "Lightning Damage Electrocutes",
+      "Shocked Ground Trails"
+    ],
+    "datamined": [
+      "Gain 10% of Damage as Extra Lightning Damage",
+      "Lightning damage from Hits Contributes to Electrocution Buildup"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Momentum Rune",
+    "slug": "momentum",
+    "sprite": "data/runes/rune-momentum.webp",
+    "rare": false,
+    "combos": 36,
+    "effects": [
+      "Increased Movement Speed",
+      "Movement Speed Cannot be Slowed below base"
+    ],
+    "datamined": [
+      "Momentum Rune](/art/expedition/rune-momentum.webp \"Momentum Rune\")",
+      "15% increased Movement Speed"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Moon Rune",
+    "slug": "moon",
+    "sprite": "data/runes/rune-moon.webp",
+    "rare": false,
+    "combos": 38,
+    "effects": [
+      "Conjures moon beams"
+    ],
+    "datamined": [
+      "Moon Rune](/art/expedition/rune-moon.webp \"Moon Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Protective Rune",
+    "slug": "protective",
+    "sprite": "data/runes/rune-protective.webp",
+    "rare": false,
+    "combos": 48,
+    "effects": [
+      "Periodically gain Verisium Proximity Shields"
+    ],
+    "datamined": [
+      "Protective Rune](/art/expedition/rune-protective.webp \"Protective Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Stone Rune",
+    "slug": "stone",
+    "sprite": "data/runes/rune-stone.webp",
+    "rare": false,
+    "combos": 50,
+    "effects": [
+      "Armoured",
+      "Increased Stun Threshold",
+      "Earthly Prison"
+    ],
+    "datamined": [
+      "Stone Rune](/art/expedition/rune-stone.webp \"Stone Rune\")",
+      "100% increased Stun Threshold"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Tempest Rune",
+    "slug": "tempest",
+    "sprite": "data/runes/rune-tempest.webp",
+    "rare": false,
+    "combos": 36,
+    "effects": [
+      "Cannot be Shocked or Chilled",
+      "All Damage can Shock or Chill"
+    ],
+    "datamined": [
+      "Tempest Rune](/art/expedition/rune-tempest.webp \"Tempest Rune\")",
+      "60% chance to Avoid being Chilled",
+      "60% chance to Avoid being Shocked",
+      "All Damage from Hits Contributes to Chill Magnitude",
+      "All Damage from Hits Contributes to Shock Chance"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Tidal Rune",
+    "slug": "tidal",
+    "sprite": "data/runes/rune-tidal.webp",
+    "rare": false,
+    "combos": 38,
+    "effects": [
+      "Conjures Tidal Waves"
+    ],
+    "datamined": [
+      "Tidal Rune](/art/expedition/rune-tidal.webp \"Tidal Rune\")"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Toxic Rune",
+    "slug": "toxic",
+    "sprite": "data/runes/rune-toxic.webp",
+    "rare": false,
+    "combos": 27,
+    "effects": [
+      "Chance to Poison on Hit",
+      "Chance for Toxic Volatiles on death",
+      "All Damage from Hits can Poison"
+    ],
+    "datamined": [
+      "Toxic Rune](/art/expedition/rune-toxic.webp \"Toxic Rune\")",
+      "35% chance to Poison on Hit",
+      "All Damage from Hits Contributes to Poison Magnitude"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Volcanic Rune",
+    "slug": "gasp",
+    "sprite": "data/runes/rune-gasp.webp",
+    "rare": false,
+    "combos": 37,
+    "effects": [
+      "Extra Fire Damage",
+      "All Damage can Ignite",
+      "Burning Ground Trails"
+    ],
+    "datamined": [
+      "Volcanic Rune](/art/expedition/rune-gasp.webp \"Volcanic Rune\")",
+      "Gain 15% of Damage as Extra Fire Damage",
+      "All Damage from Hits Contributes to Flammability and Ignite Magnitudes"
+    ],
+    "danger": 3,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Bloodletting Rune",
+    "slug": "bloodletting",
+    "sprite": "data/runes/rune-bloodletting.webp",
+    "rare": false,
+    "combos": 29,
+    "effects": [
+      "Life Leech",
+      "Cannot have Life Leeched from",
+      "Inflicts Corrupted Blood on Hit"
+    ],
+    "datamined": [
+      "Bloodletting Rune](/art/expedition/rune-bloodletting.webp \"Bloodletting Rune\")",
+      "Leech 190% of Physical Attack Damage as Life"
+    ],
+    "danger": 4,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Celestial Rune",
+    "slug": "celestial",
+    "sprite": "data/runes/rune-celestial.webp",
+    "rare": false,
+    "combos": 53,
+    "effects": [
+      "Chance for a Fire Explosion on Death",
+      "Chance for a Cold Explosion on Death",
+      "Chance for a Lightning Explosion on Death"
+    ],
+    "datamined": [
+      "Celestial Rune](/art/expedition/rune-celestial.webp \"Celestial Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Cyclonic Rune",
+    "slug": "cyclonic",
+    "sprite": "data/runes/rune-cyclonic.webp",
+    "rare": false,
+    "combos": 50,
+    "effects": [
+      "Chance to inflict Exposure on Hit",
+      "Armour Break on Hit",
+      "Wither on Hit"
+    ],
+    "datamined": [
+      "Cyclonic Rune](/art/expedition/rune-cyclonic.webp \"Cyclonic Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Prismatic Rune",
+    "slug": "prismatic",
+    "sprite": "data/runes/rune-prismatic.webp",
+    "rare": false,
+    "combos": 50,
+    "effects": [
+      "Always Shock",
+      "All Damage can Shock",
+      "All Damage can Chill",
+      "All Elemental Resistance",
+      "Damage gained as a Random Element"
+    ],
+    "datamined": [
+      "Prismatic Rune](/art/expedition/rune-prismatic.webp \"Prismatic Rune\")",
+      "+15% to all Elemental Resistances",
+      "All Damage from Hits Contributes to Chill Magnitude",
+      "All Damage from Hits Contributes to Flammability and Ignite Magnitudes",
+      "All Damage from Hits Contributes to Shock Chance"
+    ],
+    "danger": 4,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Rage Rune",
+    "slug": "rage",
+    "sprite": "data/runes/rune-rage.webp",
+    "rare": false,
+    "combos": 43,
+    "effects": [
+      "Periodically Enrage"
+    ],
+    "datamined": [
+      "Rage Rune](/art/expedition/rune-rage.webp \"Rage Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "neutral",
+    "tier": "C"
+  },
+  {
+    "name": "Rebirth Rune",
+    "slug": "rebirth",
+    "sprite": "data/runes/rune-rebirth.webp",
+    "rare": false,
+    "combos": 54,
+    "effects": [
+      "Chance to Rebirth on death"
+    ],
+    "datamined": [
+      "Rebirth Rune](/art/expedition/rune-rebirth.webp \"Rebirth Rune\")"
+    ],
+    "danger": 4,
+    "propagate": "good",
+    "tier": "A"
+  }
+]

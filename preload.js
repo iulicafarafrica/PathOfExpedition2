@@ -16,8 +16,15 @@ contextBridge.exposeInMainWorld("api", {
   setMinValue: (v) => ipcRenderer.invoke("set-min-value", v),
   selectRegion: () => ipcRenderer.invoke("select-region"),
   refreshPrices: () => ipcRenderer.invoke("refresh-prices"),
+  // Rune Planner
+  plannerData: () => ipcRenderer.invoke("planner-data"),
+  planRecipes: (runes) => ipcRenderer.invoke("plan-recipes", runes),
+  captureRunes: () => ipcRenderer.invoke("capture-runes"),
+  selectRuneRegion: () => ipcRenderer.invoke("select-rune-region"),
+  toggleRuneOverlay: (on) => ipcRenderer.invoke("toggle-rune-overlay", on),
   onScan: (cb) => ipcRenderer.on("scan", (_e, data) => cb(data)),
   onAlert: (cb) => ipcRenderer.on("alert", (_e, data) => cb(data)),
   onOverlayState: (cb) => ipcRenderer.on("overlay-state", (_e, on) => cb(on)),
+  onRuneOverlayState: (cb) => ipcRenderer.on("rune-overlay-state", (_e, on) => cb(on)),
   sendRegion: (region) => ipcRenderer.send("region-selected", region),
 });

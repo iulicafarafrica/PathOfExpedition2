@@ -5,6 +5,7 @@ const os = require("os");
 const { spawn } = require("child_process");
 const crypto = require("crypto");
 const { parseLines } = require("./rows");
+const planner = require("./planner");
 
 // alertele sonore pornesc fara gest de utilizator (altfel AudioContext-ul din renderer e blocat)
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -41,6 +42,7 @@ log("configPath:", path.join(app.getPath ? "(app not ready)" : "", "config.json"
 let win = null;
 let debugWin = null;   // fereastra Debug (log OCR)
 let overlayWin = null;   // overlay-ul transparent peste panoul din joc
+let runeOverlayWin = null;   // overlay separat, doar pt rune (Rune Planner)
 let lastScanPayload = null;  // ultimul scan reusit (repornit odata cu overlay-ul)
 let lastCaptureK = 0;   // raportul px fizici/DIP al ultimei capturi (alinierea chipurilor)
 let config = loadConfig();
@@ -647,7 +649,7 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 function loadConfig() {
-  const defaults = { league: "Forbidden Rites", region: null, overlay: false, soundAlert: false, minDivine: 0, hideNames: false };
+  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
     log("loadConfig: citit", raw.length, "chari");
@@ -698,6 +700,8 @@ function createWindow() {
     // daca inchidem fereastra principala, dispare si overlay-ul (fara fantome peste joc)
     if (overlayWin && !overlayWin.isDestroyed()) overlayWin.close();
     overlayWin = null;
+    if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.close();
+    runeOverlayWin = null;
   });
 }
 
@@ -959,10 +963,103 @@ function toggleOverlay(on) {
   return { ok: true, on: true };
 }
 
+// ---------- overlay separat de RUNE (Rune Planner) ----------
+// Fereastra proprie, independenta de overlay-ul de preturi: transparenta, click-through,
+// pozitionata in dreapta regiunii de rune. Randata de runeoverlay.html care isi face
+// singur captura (capture-runes) + template-matching + reverse-lookup, pe un interval.
+const RUNE_OVERLAY_STRIP = 430;   // px DIP de banda libera in dreapta regiunii de rune
+function runeOverlayBounds() {
+  const r = config.runeRegion;
+  if (!r) return null;
+  return { x: r.x + r.width, y: r.y, width: RUNE_OVERLAY_STRIP, height: Math.max(140, r.height) };
+}
+function toggleRuneOverlay(on) {
+  if (on !== true) {
+    config.runeOverlay = false;
+    saveConfig();
+    if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.close();
+    runeOverlayWin = null;
+    return { ok: true, on: false };
+  }
+  if (!config.runeRegion) return { ok: false, on: false, error: "Set the rune region first." };
+  const b = runeOverlayBounds();
+  if (runeOverlayWin && !runeOverlayWin.isDestroyed()) { runeOverlayWin.setBounds(b); return { ok: true, on: true }; }
+  runeOverlayWin = new BrowserWindow({
+    x: b.x, y: b.y, width: b.width, height: b.height,
+    frame: false, transparent: true, resizable: false, movable: false,
+    focusable: false, skipTaskbar: true, hasShadow: false, show: false,
+    alwaysOnTop: true,
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
+  });
+  runeOverlayWin.setAlwaysOnTop(true, "screen-saver");
+  runeOverlayWin.setIgnoreMouseEvents(true);
+  runeOverlayWin.setMenuBarVisibility(false);
+  runeOverlayWin.loadFile(path.join(__dirname, "renderer", "runeoverlay.html"));
+  runeOverlayWin.once("ready-to-show", () => {
+    if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.showInactive();   // nu fura focusul
+  });
+  runeOverlayWin.on("closed", () => { runeOverlayWin = null; });
+  config.runeOverlay = true;
+  saveConfig();
+  return { ok: true, on: true };
+}
+function notifyRuneOverlayState() {
+  if (win && !win.isDestroyed()) win.webContents.send("rune-overlay-state", !!(runeOverlayWin && !runeOverlayWin.isDestroyed()));
+}
+
 // ---------- IPC ----------
 ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale }));
+// ---------- Rune Planner (baza de date + reverse-lookup) ----------
+// Datele (data/runes.json + data/recipes.json) se incarca o singura data.
+planner.loadData();
+ipcMain.handle("planner-data", () => {
+  try { return { ok: true, runes: planner.listRunes(), chase: planner.listChase(), recipes: planner.listRecipes() }; }
+  catch (e) { log("planner-data:", e.message); return { ok: false, error: String(e) }; }
+});
+// rune: lista de nume detectate/vazute in panou -> retete eligibile + preturi.
+ipcMain.handle("plan-recipes", (_e, runes) => {
+  try {
+    const list = Array.isArray(runes) ? runes.filter((x) => typeof x === "string").slice(0, 64) : [];
+    const priceOf = (name) => { const p = lookupPrice(name); return p ? p.price : null; };
+    const res = planner.matchRecipes(list, { priceOf });
+    const enrich = (a) => a.map((r) => {
+      const total = r.priced ? displayPrice(r.value, "auto") : null;
+      const unit = r.priced ? displayPrice(r.unitValue, "auto") : null;
+      // fallback: valoarea statica din poe2db (convertita in Divine cu ratele curente)
+      let disp = total ? total.text : null;
+      if (!disp && r.src) {
+        const perDiv = r.src.cur === "divine" ? 1 : (xchgRates[r.src.cur] || null);
+        const div = perDiv ? r.src.value / perDiv : null;
+        disp = div != null ? "~" + displayPrice(div, "auto").text : r.src.value + " " + (r.src.cur || "");
+      }
+      // cost rune de intrare + valoare neta
+      const costDisp = r.cost != null ? displayPrice(r.cost, "auto") : null;
+      const netDisp = r.net != null ? displayPrice(Math.abs(r.net), "auto") : null;
+      return {
+        ...r,
+        disp,
+        dispUnit: unit ? unit.text : null,
+        dispCost: costDisp ? costDisp.text : null,
+        dispNet: netDisp ? netDisp.text : null,
+        netPos: r.net != null ? r.net >= 0 : null,
+      };
+    });
+    return { ok: true, exact: enrich(res.exact), contains: enrich(res.contains).slice(0, 30), advice: planner.propagateAdvice(list) };
+  } catch (e) { log("plan-recipes:", e.message); return { ok: false, error: String(e) }; }
+});
 // health-check Windows OCR (butonul "Check OCR")
 ipcMain.handle("check-ocr", () => checkOcrHealth());
+// citirea runelor din panou: capturam regiunea runeRegion si trimitem PNG in renderer,
+// unde se face template-matching-ul (Chromium decodeaza webp/png nativ, mult mai rapid).
+ipcMain.handle("capture-runes", async () => {
+  try {
+    if (!config.runeRegion) return { ok: false, error: "Set the rune region first." };
+    const shot = await captureRegion(config.runeRegion);
+    const k = shot.width ? shot.width / config.runeRegion.width : 1;
+    const img = nativeImage.createFromBitmap(Buffer.from(shot.data), { width: shot.width, height: shot.height });
+    return { ok: true, dataUrl: "data:image/png;base64," + img.toPNG().toString("base64"), width: shot.width, height: shot.height, scale: k };
+  } catch (e) { log("capture-runes:", e.message); return { ok: false, error: String(e) }; }
+});
 // update: verificare ultimul release GitHub + descarcare/lanare
 ipcMain.handle("check-update", () => checkUpdate());
 ipcMain.handle("do-update", async () => {
@@ -1075,6 +1172,7 @@ ipcMain.handle("scan-now", async () => {
 // pornire/oprire overlay in joc (butonul "Overlay" din fereastra principala);
 // primeste doar boolean, nimic altceva
 ipcMain.handle("toggle-overlay", (_e, on) => toggleOverlay(on === true));
+ipcMain.handle("toggle-rune-overlay", (_e, on) => { const res = toggleRuneOverlay(on === true); notifyRuneOverlayState(); return res; });
 // alerta sonora la item >= 1 Divine: doar boolean, persistat in config
 ipcMain.handle("set-sound-alert", (_e, on) => {
   config.soundAlert = on === true;
@@ -1099,10 +1197,11 @@ ipcMain.handle("set-hide-names", (_e, on) => {
   return { ok: true, hideNames: config.hideNames };
 });
 
-ipcMain.handle("select-region", async () => {
+// flux comun de selectare region; kind = "scan" (regiunea de preturi) | "rune" (iconitele de rune)
+function selectRegionFlow(kind) {
   selectOpen = true;   // nu fac scan cat timp box-ul e deschis
   if (overlayWin && !overlayWin.isDestroyed()) overlayWin.hide();  // nu acoperim box-ul de selectie
-  // deschide o fereastra mica simpla de selectie (drag box)
+  if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.hide();
   const sel = new (require("electron").BrowserWindow)({
     width: 500,
     height: 350,
@@ -1118,29 +1217,38 @@ ipcMain.handle("select-region", async () => {
   sel.loadFile(path.join(__dirname, "renderer", "select.html"));
   return new Promise((resolve) => {
     ipcMain.once("region-selected", (_e, region) => {
-      log("region-selected: primit", JSON.stringify(region));
+      log(kind + " region-selected:", JSON.stringify(region));
       selectOpen = false;
       const ovl = overlayWin && !overlayWin.isDestroyed() ? overlayWin : null;
       const r = region || {};
       if (![r.x, r.y, r.width, r.height].every((n) => Number.isFinite(n)) || r.width < 40 || r.height < 30) {
         log("region rejected: geometrie invalida");
         try { sel.close(); } catch {}
-        if (ovl) ovl.showInactive();   // regiune neschimbata -> repunem overlay-ul
+        if (ovl && kind === "scan") ovl.showInactive();
+        if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.showInactive();
         resolve(null);
         return;
       }
       try {
-        // completam displayId cu display-ul primar (sau cel mai apropiat)
         const disp = screen.getDisplayNearestPoint({ x: region.x + region.width / 2, y: region.y + region.height / 2 });
-        config.region = { x: region.x, y: region.y, width: region.width, height: region.height, displayId: disp.id };
-        saveConfig();
-        // overlay-ul se repoziționeaza pe noua regiune (cu banda din dreapta)
-        if (ovl) { ovl.setBounds(overlayBounds()); ovl.showInactive(); }
-        lastScanHash = null;   // regiune noua -> primul scan trebuie sa ruleze OCR
-        lastOverlaySig = "";   // si overlay-ul trebuie re-randat complet
-        startPoll();   // porneste scanarea automata imediat ce regiunea e setata
+        const reg = { x: region.x, y: region.y, width: region.width, height: region.height, displayId: disp.id };
+        if (kind === "rune") {
+          config.runeRegion = reg;
+          saveConfig();
+          if (runeOverlayWin && !runeOverlayWin.isDestroyed()) {
+            const rb = runeOverlayBounds();
+            if (rb) { runeOverlayWin.setBounds(rb); runeOverlayWin.showInactive(); }
+          }
+        } else {
+          config.region = reg;
+          saveConfig();
+          if (ovl) { ovl.setBounds(overlayBounds()); ovl.showInactive(); }
+          lastScanHash = null;
+          lastOverlaySig = "";
+          startPoll();
+        }
         sel.close();
-        resolve(config.region);
+        resolve(reg);
       } catch (e) {
         console.error("SELECT-ERROR:", e);
         try { sel.close(); } catch {}
@@ -1148,7 +1256,9 @@ ipcMain.handle("select-region", async () => {
       }
     });
   });
-});
+}
+ipcMain.handle("select-region", () => selectRegionFlow("scan"));
+ipcMain.handle("select-rune-region", () => selectRegionFlow("rune"));
 
 // ---------- hotkeys globale (functioneaza si cand jocul e in focus) ----------
 // Ctrl+Alt+O: overlay on/off | Ctrl+Alt+R: rescan | Ctrl+Alt+C: copiaza pretul

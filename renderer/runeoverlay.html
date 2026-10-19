@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: file: https://web.poecdn.com"
+/>
+<title>Path of Expedition — Rune Overlay</title>
+<style>
+  @font-face { font-family: "Norse"; src: url("fonts/Norse.otf") format("opentype"); font-weight: normal; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+  /* pe fiecare rand din panou: DANGER + rezultatul combinatiei + ce rune merita duse mai departe (fara pret) */
+  .r {
+    position: absolute; left: 0;
+    display: flex; align-items: flex-start; gap: 8px;
+    width: max-content; max-width: calc(100% - 4px);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 13px; white-space: nowrap;
+    color: #ead9a8;
+    background: rgba(6, 5, 4, .96);
+    border: 1px solid rgba(214, 198, 156, .55);
+    border-radius: 5px; padding: 4px 8px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .95);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, .7);
+  }
+  .dgr { flex-shrink: 0; margin-top: 1px; padding: 1px 7px; border-radius: 8px; font-size: 10px; font-weight: bold; color: #fff; letter-spacing: .3px; }
+  .dgr.d1 { background: #3f6d34; }
+  .dgr.d2 { background: #5a7430; }
+  .dgr.d3 { background: #7d7020; }
+  .dgr.d4 { background: #9c5f18; }
+  .dgr.d5 { background: #ad4018; }
+  .dgr.d6 { background: #b02424; }
+  .txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow: hidden; }
+  .rw { font-size: 13px; font-weight: bold; color: #f2e6bd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rw.multi { color: #d8c391; }
+  .rw.unk { color: #9a8760; font-weight: normal; font-style: italic; }
+  .sub { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sp { color: #9fd39a; font-weight: bold; }
+  .av { color: #e79a9a; font-weight: bold; }
+  .muted { color: #9a8760; }
+  .jk { color: #f2c14e; }
+  #hint {
+    position: absolute; left: 0; top: 0;
+    font-family: Georgia, "Times New Roman", serif; font-size: 12px; color: #cbbc92;
+    background: rgba(6, 5, 4, .9); border: 1px solid rgba(214, 198, 156, .35);
+    border-radius: 5px; padding: 3px 9px; white-space: nowrap; max-width: calc(100% - 4px);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
+  }
+</style>
+</head>
+<body>
+<div id="rows"></div>
+<div id="hint" hidden></div>
+<script src="runereader.js"></script>
+<script>
+const rowsEl = document.getElementById("rows");
+const hintEl = document.getElementById("hint");
+let byName = new Map();
+let byKey = new Map();   // cheie = rune sortate -> lista de retete posibile
+let chase = new Set();
+let running = false;
+let lastPaint = "";
+// cand panoul din joc e inchis (fara randuri), hint-ul ramane afisat doar cateva
+// secunde, apoi dispare - sa nu mai stea "legenda" peste ecran cand joaci.
+let noRowsSince = 0;
+const NO_ROWS_HINT_MS = 5000;
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function short(n) { return String(n).replace(/\s*Rune$/i, ""); }
+function key(names) { return names.slice().sort().join("|"); }
+function showHint(msg) { hintEl.hidden = false; hintEl.textContent = msg; }
+
+function rowHtml(det, y) {
+  let sum = 0, max = 0;
+  const good = [], bad = [];
+  for (const d of det) {
+    const info = byName.get(d.name);
+    const dg = info && Number.isFinite(info.danger) ? info.danger : 3;
+    sum += dg; if (dg > max) max = dg;
+    if (info && info.propagate === "good") good.push(info);
+    else if (info && info.propagate === "bad") bad.push(info);
+  }
+  const dgr = `<span class="dgr d${Math.max(1, Math.min(6, max))}" title="Monster danger (sum ${sum}, max ${max})">DANGER ${sum}</span>`;
+
+  const list = byKey.get(key(det.map((d) => d.name))) || [];
+  let rw;
+  if (list.length === 1) {
+    const r = list[0];
+    const star = chase.has(r.reward.toLowerCase()) ? ' <span class="jk" title="Jackpot or permanent Boon">\u2605</span>' : "";
+    rw = `<b class="rw">${r.qty > 1 ? r.qty + "\u00d7 " : ""}${esc(r.reward)}${star}</b>`;
+  } else if (list.length > 1) {
+    rw = `<b class="rw multi">${list.length} possible results</b>`;
+  } else {
+    rw = `<b class="rw unk">unknown combination</b>`;
+  }
+
+  let sub;
+  if (good.length) {
+    const g = good.map((x) => esc(short(x.name)) + (x.tier ? " (" + x.tier + ")" : "")).join(", ");
+    sub = `<span class="sub sp">Spread \u2192 ${g} \u00b7 carry a copy into later Remnants</span>`;
+  } else if (bad.length) {
+    sub = `<span class="sub av">Don't carry forward: ${esc(bad.map((x) => short(x.name)).join(", "))}</span>`;
+  } else {
+    sub = `<span class="sub muted">No rune here is worth spreading \u2014 safe to pick any</span>`;
+  }
+  return `<div class="r" style="top:${y}px">${dgr}<span class="txt">${rw}${sub}</span></div>`;
+}
+
+async function tick() {
+  if (running || document.hidden) return;
+  running = true;
+  try {
+    const cap = await window.api.captureRunes();
+    if (!cap || !cap.ok) { rowsEl.innerHTML = ""; lastPaint = ""; showHint((cap && cap.error) || "Set the rune region first."); return; }
+    const rows = await RuneReader.detectRows(cap.dataUrl, cap.scale);
+    const good = rows.filter((r) => r.det.length >= 2 && Math.max(...r.det.map((d) => d.sc)) >= 0.4);
+    if (!good.length) { rowsEl.innerHTML = ""; lastPaint = ""; showHint("No rune rows detected \u2014 box the panel (or ONE row) again."); return; }
+    hintEl.hidden = true;
+    const k = cap.scale > 0 ? cap.scale : 1;
+    const html = good.map((r) => rowHtml(r.det, Math.max(0, Math.round(r.cy / k) - 17))).join("");
+    if (html !== lastPaint) { rowsEl.innerHTML = html; lastPaint = html; }
+  } catch (e) {
+    // nu spamam; revine la urmatorul tick
+  } finally { running = false; }
+}
+
+(async () => {
+  try {
+    const d = await window.api.plannerData();
+    if (d && d.ok) {
+      byName = new Map(d.runes.map((r) => [r.name, r]));
+      byKey = new Map();
+      for (const rec of d.recipes || []) {
+        const k = key(rec.runes);
+        if (!byKey.has(k)) byKey.set(k, []);
+        byKey.get(k).push(rec);
+      }
+      chase = new Set((d.chase || []).map((c) => c.reward.toLowerCase()));
+      await RuneReader.init(d.runes);
+    }
+  } catch {}
+  tick();
+  setInterval(tick, 2000);
+})();
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://web.poecdn.com"
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: file: https://web.poecdn.com"
 />
 <title>Path of Expedition</title>
 <style>
@@ -112,11 +112,99 @@
     box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
   .upd-banner:hover { text-decoration:underline; }
+  /* ---------- tabs ---------- */
+  .tabs { display:flex; gap:4px; justify-content:center; }
+  .tab {
+    font-family:inherit; font-size:12px; font-weight:bold; color:var(--ink);
+    background:linear-gradient(#d0be94, #bda878);
+    border:1px solid var(--line); border-bottom:0; border-radius:4px 4px 0 0;
+    padding:5px 14px; cursor:pointer; opacity:.72;
+  }
+  .tab.active { background:linear-gradient(#e0d1ad, #d3c19a); opacity:1; }
+  .panel { display:flex; flex-direction:column; gap:7px; flex:1; min-height:0; }
+  .panel[hidden] { display:none; }
+  /* ---------- Rune Planner ---------- */
+  .chips { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:4px; }
+  .chip {
+    display:flex; align-items:center; gap:5px; padding:3px 5px;
+    background:linear-gradient(#e0d1ad,#d3c19a); border:1px solid var(--line);
+    border-radius:3px; cursor:pointer; font-size:11px; color:var(--ink-soft);
+    font-weight:bold; user-select:none; min-width:0; overflow:hidden;
+  }
+  .chip > span { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip img { width:22px; height:22px; flex-shrink:0; }
+  .chip:hover { background:linear-gradient(#e7dab8,#dccaa4); }
+  .chip.sel { background:linear-gradient(#b7d9a0,#9cc47e); color:var(--ink); box-shadow:inset 0 0 0 1px #5f8a4a; }
+  .chip.rare { border-color:var(--gold); }
+  .chip .cn {
+    margin-left:auto; background:#3b2f1c; color:#f2e4c0; border-radius:8px;
+    padding:0 5px; font-size:10px; line-height:14px; font-weight:bold;
+  }
+  .plist {
+    background:linear-gradient(#e0d1ad, #d3c19a);
+    border:2px solid var(--line); border-radius:4px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.25);
+    padding:2px 8px; overflow:auto; max-height:230px;
+  }
+  .sec-h { font-size:11px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.6px; margin:3px 2px 0; }
+  .pr { display:flex; align-items:center; gap:7px; padding:4px 3px; border-bottom:1px solid rgba(138,111,71,.35); }
+  .pr:last-child { border-bottom:0; }
+  .pr .rq { font-size:11px; font-weight:bold; color:var(--ink-soft); flex-shrink:0; }
+  .pr .rname { flex:1; min-width:0; font-size:13px; color:var(--ink); }
+  .pr .rname .sub { display:block; font-size:10px; color:var(--ink-soft); font-weight:normal; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pr .rprice { font-weight:bold; color:var(--gold); font-size:13px; white-space:nowrap; }
+  .pr .net { flex-shrink:0; font-size:10px; font-weight:bold; padding:1px 6px; border-radius:8px; white-space:nowrap; }
+  .pr .net.pos { background:#2f6b34; color:#dff3e0; }
+  .pr .net.neg { background:#7a2d2d; color:#f6dede; }
+  .dgr { flex-shrink:0; padding:0 6px; border-radius:8px; font-size:10px; font-weight:bold; color:#fff; }
+  .dgr.d1, .dgr.d2 { background:#2f6b34; }
+  .dgr.d3 { background:#b8860b; }
+  .dgr.d4 { background:#b25e00; }
+  .dgr.d5 { background:#8a2a2a; }
+  .mini { font-size:11px; color:var(--ink-soft); text-align:center; font-style:italic; min-height:13px; }
+  .spread { color:var(--green); font-weight:bold; font-style:normal; }
+  .avoid { color:#8a2a2a; font-weight:bold; font-style:normal; }
+  .tips {
+    font-size:11px; line-height:1.45; color:var(--ink-soft); text-align:left; font-style:normal;
+    background:rgba(255,255,255,.18); border:1px solid rgba(138,111,71,.35);
+    border-radius:4px; padding:5px 8px;
+  }
+  .tips b { color:var(--ink); }
+  .chip .tb { flex-shrink:0; font-size:9px; line-height:14px; padding:0 4px; border-radius:7px; font-weight:bold; color:#fff; }
+  .chip .tb.SS { background:#b8860b; }
+  .chip .tb.S { background:#8a2a2a; }
+  .chip .tb.A { background:#4a5d8a; }
+  .chase { display:flex; flex-direction:column; gap:3px; }
+  .chase .citem {
+    display:flex; align-items:center; gap:6px; padding:3px 6px;
+    border:1px solid rgba(138,111,71,.35); border-radius:3px;
+    background:linear-gradient(#e0d1ad,#d3c19a); font-size:11px;
+  }
+  .chase .citem.on { background:linear-gradient(#b7d9a0,#9cc47e); box-shadow:inset 0 0 0 1px #5f8a4a; }
+  .chase .ck { flex-shrink:0; font-size:9px; font-weight:bold; padding:0 5px; border-radius:7px; color:#fff; background:#8a6b1f; }
+  .chase .ck.boon { background:#4a5d8a; }
+  .chase .cr { font-weight:bold; color:var(--ink); white-space:nowrap; }
+  .chase .cu { color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chase .cst { margin-left:auto; flex-shrink:0; font-size:9px; font-weight:bold; color:var(--green); }
+  .pr .boonb { flex-shrink:0; font-size:9px; font-weight:bold; padding:0 5px; border-radius:7px; background:#4a5d8a; color:#fff; }
+  .cbsearch {
+    font-family:inherit; font-size:11px; color:var(--ink); background:#efe3c4;
+    border:1px solid var(--line); border-radius:3px; padding:4px 7px; min-width:150px;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.15);
+  }
+  .cb-list { flex:1; min-height:0; max-height:none; }
+  .ctag { flex-shrink:0; font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.4px; color:#fff; background:#6b5a33; border-radius:7px; padding:0 5px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Path of Expedition</h1>
+  <div class="tabs">
+    <div class="tab active" id="tabBtnPrices">Prices</div>
+    <div class="tab" id="tabBtnPlanner">Rune Planner</div>
+    <div class="tab" id="tabBtnCombos">All Combos</div>
+  </div>
+  <div id="tab-prices" class="panel">
   <div class="btns">
     <label class="corelbl">League:
       <select id="league"></select>
@@ -144,12 +232,47 @@
   <div id="status" class="status">Loading…</div>
   <div id="list" class="list"><div class="empty">No prices yet.</div></div>
   <div class="spacer"></div>
+  </div><!-- /tab-prices -->
+  <div id="tab-planner" class="panel" hidden>
+    <div class="btns">
+      <button id="setRuneRegion" title="Drag a box over ONE row of rune icons">Set rune region</button>
+      <button id="rdRunes" title="Detect the runes shown in the panel">Read from screen</button>
+      <button id="runeOvl" title="Show the rune recipe + price over the game (click-through)">Rune overlay: OFF</button>
+      <button id="clrRunes">Clear</button>
+    </div>
+    <div class="tips" id="plHelp"><b>Chain tips:</b> only the <b>gold-bordered</b> rune propagates to later Remnants — early pick for the propagated rune, late for the reward, highest-slot Remnant last. Same runes don't stack (one copy is enough). <b>SS</b> Opulent · <b>S</b> Power/Bond/Oath/Death · <b>A</b> Time/Rebirth/Soul. Avoid spreading Life. Don't reroll a Boon.</div>
+    <div id="plAdvice" class="mini"></div>
+    <div id="plChips" class="chips"></div>
+    <div class="sec-h">Chase <span style="text-transform:none;letter-spacing:0;font-weight:normal">(jackpots · permanent boons)</span></div>
+    <div id="plChase" class="chase"></div>
+    <div class="sec-h">Exact recipe</div>
+    <div id="plExact" class="plist"><div class="empty">Pick the runes shown in the Runeshape panel.</div></div>
+    <div class="sec-h">Can extend to</div>
+    <div id="plMore" class="plist"></div>
+    <div id="plStatus" class="mini"></div>
+  </div><!-- /tab-planner -->
+  <div id="tab-combos" class="panel" hidden>
+    <div class="btns">
+      <input id="cbSearch" class="cbsearch" type="search" placeholder="Search rune or reward…">
+      <select id="cbCat">
+        <option value="all">All categories</option>
+        <option value="Alloys">Alloys</option>
+        <option value="Currency">Currency</option>
+        <option value="Gems">Gems</option>
+        <option value="Runes">Runes</option>
+        <option value="Uniques">Uniques</option>
+      </select>
+    </div>
+    <div class="mini" id="cbCount"></div>
+    <div id="cbList" class="plist cb-list"></div>
+  </div><!-- /tab-combos -->
   <div class="hk"><b>Ctrl+Alt+O</b> overlay · <b>Ctrl+Alt+R</b> rescan · <b>Ctrl+Alt+C</b> copy price · <b>Ctrl+Alt+T</b> item page</div>
   <div class="footer">
     <span>made by iulian.icb · <span id="ver">v—</span> · <span id="pricesTime" class="priceline">Prices updated: —</span></span>
     <a id="bmc">☕ Buy me a coffee</a>
   </div>
 </div>
+<script src="runereader.js"></script>
 <script>
 const statusEl = document.getElementById("status");
 const listEl = document.getElementById("list");
@@ -418,7 +541,183 @@ window.api.onOverlayState((on) => {
   statusEl.textContent = on ? "Overlay on (hotkey)." : "Overlay off (hotkey).";
 });
 
+// ---------- tabs ----------
+function showTab(which) {
+  const ids = { prices: "tab-prices", planner: "tab-planner", combos: "tab-combos" };
+  for (const k of Object.keys(ids)) {
+    document.getElementById(ids[k]).hidden = k !== which;
+    document.getElementById("tabBtn" + k[0].toUpperCase() + k.slice(1)).classList.toggle("active", k === which);
+  }
+}
+document.getElementById("tabBtnPrices").onclick = () => showTab("prices");
+document.getElementById("tabBtnPlanner").onclick = () => showTab("planner");
+document.getElementById("tabBtnCombos").onclick = () => showTab("combos");
+
+// ---------- Rune Planner ----------
+let plannerRunes = [];
+let plannerChase = [];
+let allRecipes = [];
+const TIER_ORDER = { SS: 0, S: 1, A: 2, B: 3, C: 4 };
+const runeCounts = new Map();   // nume runa -> numar de aparitii (suporta duplicate)
+const plExactEl = document.getElementById("plExact");
+const plMoreEl = document.getElementById("plMore");
+const plChipsEl = document.getElementById("plChips");
+const plChaseEl = document.getElementById("plChase");
+const plAdviceEl = document.getElementById("plAdvice");
+const plStatusEl = document.getElementById("plStatus");
+
+function runeShort(n) { return String(n).replace(/\s*Rune$/i, ""); }
+function dgrHtml(d) { return `<span class="dgr d${d.max}" title="Monster danger (sum ${d.sum}, max ${d.max})">DANGER ${d.sum}</span>`; }
+function selectedList() { const out = []; for (const [n, c] of runeCounts) for (let i = 0; i < c; i++) out.push(n); return out; }
+function bumpRune(name, delta) { const c = (runeCounts.get(name) || 0) + delta; if (c <= 0) runeCounts.delete(name); else runeCounts.set(name, c); }
+
+async function initPlanner() {
+  const d = await window.api.plannerData();
+  if (!d || !d.ok) { plStatusEl.textContent = "Planner data unavailable."; return; }
+  plannerRunes = d.runes;
+  plannerChase = d.chase || [];
+  allRecipes = d.recipes || [];
+  renderChips();
+  renderChase();
+  renderCombos();
+  RuneReader.init(plannerRunes).catch(() => {});
+  window.api.getConfig().then((c) => { if (c) setRuneOvlBtn(!!c.runeOverlay); }).catch(() => {});
+}
+function renderChips() {
+  const sorted = plannerRunes.slice().sort((a, b) =>
+    (TIER_ORDER[a.tier] ?? 9) - (TIER_ORDER[b.tier] ?? 9) ||
+    (b.rare ? 1 : 0) - (a.rare ? 1 : 0) ||
+    a.name.localeCompare(b.name));
+  plChipsEl.innerHTML = sorted.map((r) => {
+    const cnt = runeCounts.get(r.name) || 0;
+    const sel = cnt ? " sel" : "";
+    const rare = r.rare ? " rare" : "";
+    const badge = cnt > 1 ? `<b class="cn">×${cnt}</b>` : "";
+    const tb = (r.tier === "SS" || r.tier === "S" || r.tier === "A") ? `<b class="tb ${r.tier}" title="Propagation tier ${r.tier}">${r.tier}</b>` : "";
+    const tip = `${r.rare ? "Rare · " : ""}Tier ${r.tier} · ${r.effects.join(" · ")}\n\nLeft-click: add · Right-click: remove`;
+    return `<div class="chip${sel}${rare}" data-name="${esc(r.name)}" title="${esc(tip)}"><img src="../data/runes/rune-${esc(r.slug)}.webp" alt="">${tb}<span>${esc(runeShort(r.name))}</span>${badge}</div>`;
+  }).join("");
+  plChipsEl.querySelectorAll(".chip").forEach((c) => {
+    const n = c.dataset.name;
+    c.onclick = () => { bumpRune(n, 1); renderChips(); updatePlan(); };
+    c.oncontextmenu = (e) => { e.preventDefault(); bumpRune(n, -1); renderChips(); updatePlan(); };
+  });
+}
+function countsOf(arr) { const m = new Map(); for (const x of arr) m.set(x, (m.get(x) || 0) + 1); return m; }
+function renderChase() {
+  if (!plannerChase.length) { plChaseEl.innerHTML = ""; return; }
+  plChaseEl.innerHTML = plannerChase.map((c) => {
+    const target = countsOf(c.runes);
+    let on = runeCounts.size > 0;
+    if (on) for (const [n, cnt] of runeCounts) if ((target.get(n) || 0) < cnt) { on = false; break; }
+    const isBoon = c.kind === "boon";
+    const q = c.qty > 1 ? `${c.qty}× ` : "";
+    return `<div class="citem${on ? " on" : ""}"><span class="ck${isBoon ? " boon" : ""}">${isBoon ? "BOON" : "JACKPOT"}</span><span class="cr">${q}${esc(c.reward)}</span><span class="cu">${esc(c.runes.map(runeShort).join(" · "))}</span>${on ? '<span class="cst">on track</span>' : ""}</div>`;
+  }).join("");
+}
+function renderPlanList(el, arr, emptyMsg) {
+  if (!arr || !arr.length) { el.innerHTML = emptyMsg ? `<div class="empty">${esc(emptyMsg)}</div>` : `<div class="empty">—</div>`; return; }
+  el.innerHTML = arr.map((r) => {
+    const runes = r.runes.map(runeShort).join(" · ");
+    const extra = r.danger.extra ? `  (+${r.danger.extra} more)` : "";
+    const costTxt = r.dispCost ? ` · cost ${esc(r.dispCost)}` : "";
+    const price = r.disp ? esc(r.disp) : (r.random ? "random" : "?");
+    const q = r.qty > 1 ? `<span class="rq">${r.qty}×</span>` : "";
+    const netHtml = r.dispNet != null ? `<span class="net ${r.netPos ? "pos" : "neg"}" title="Value minus cost of input runes (excl. Verisium)">${r.netPos ? "+" : "−"}${esc(r.dispNet)}</span>` : "";
+    const boon = /boon$/i.test(r.reward) ? `<span class="boonb" title="Permanent account upgrade — do not reroll">BOON</span>` : "";
+    return `<div class="pr">${q}<span class="rname">${esc(r.reward)}<span class="sub">${esc(runes)}${extra}${costTxt}</span></span>${boon}${dgrHtml(r.danger)}${netHtml}<span class="rprice">${price}</span></div>`;
+  }).join("");
+}
+async function updatePlan() {
+  const runes = selectedList();
+  if (!runes.length) {
+    plExactEl.innerHTML = `<div class="empty">Pick the runes shown in the Runeshape panel.</div>`;
+    plMoreEl.innerHTML = "";
+    plAdviceEl.textContent = "";
+    renderChase();
+    return;
+  }
+  const res = await window.api.planRecipes(runes);
+  if (!res || !res.ok) { plExactEl.innerHTML = `<div class="err">${esc((res && res.error) || "error")}</div>`; return; }
+  renderPlanList(plExactEl, res.exact, "No exact recipe for this combination.");
+  renderPlanList(plMoreEl, res.contains, "");
+  const a = res.advice || { good: [], bad: [] };
+  const parts = [];
+  if (a.good.length) parts.push(`<span class="spread">Spread:</span> ${esc(a.good.map(runeShort).join(", "))}`);
+  if (a.bad.length) parts.push(`<span class="avoid">Avoid spreading:</span> ${esc(a.bad.map(runeShort).join(", "))}`);
+  plAdviceEl.innerHTML = parts.join(" &nbsp;·&nbsp; ");
+  renderChase();
+}
+document.getElementById("clrRunes").onclick = () => { runeCounts.clear(); renderChips(); updatePlan(); };
+
+// overlay separat de rune (fereastra proprie, click-through, in dreapta regiunii de rune)
+const runeOvlBtn = document.getElementById("runeOvl");
+function setRuneOvlBtn(on) { runeOvlBtn.textContent = "Rune overlay: " + (on ? "ON" : "OFF"); runeOvlBtn.classList.toggle("on", on); }
+runeOvlBtn.onclick = async () => {
+  const res = await window.api.toggleRuneOverlay(!runeOvlBtn.classList.contains("on"));
+  if (res && res.ok) setRuneOvlBtn(res.on);
+  else plStatusEl.textContent = "Rune overlay: " + ((res && res.error) || "failed");
+};
+window.api.onRuneOverlayState((on) => setRuneOvlBtn(on));
+
+// rune reader extracted to runereader.js (shared with the rune overlay)
+
+document.getElementById("setRuneRegion").onclick = async () => {
+  plStatusEl.textContent = "Drag a box over ONE row of rune icons, then press Enter.";
+  await window.api.selectRuneRegion();
+  plStatusEl.textContent = "Rune region saved. Now press Read from screen.";
+};
+document.getElementById("rdRunes").onclick = async () => {
+  if (!RuneReader.ready()) { plStatusEl.textContent = "Loading rune templates…"; await RuneReader.init(plannerRunes); }
+  plStatusEl.textContent = "Reading runes…";
+  const r = await window.api.captureRunes();
+  if (!r || !r.ok) { plStatusEl.textContent = "Read failed: " + ((r && r.error) || "unknown"); return; }
+  try {
+    const res = await RuneReader.detect(r.dataUrl, r.scale);
+    const det = res.det;
+    if (!det.length) { plStatusEl.textContent = "No runes detected — check the rune region."; return; }
+    runeCounts.clear();
+    let low = 0;
+    for (const dm of det) { if (plannerRunes.some((x) => x.name === dm.name)) bumpRune(dm.name, 1); if (dm.sc < 0.45) low++; }
+    renderChips(); updatePlan();
+    const note = res.rows > 1 ? "  — box covers " + res.rows + " rows (used the " + det.length + "-rune one); box just ONE row" : "";
+    plStatusEl.textContent = "Detected: " + det.map((dm) => runeShort(dm.name) + " (" + dm.sc.toFixed(2) + ")").join(", ") + (low ? "  — check low-confidence" : "") + note;
+  } catch (e) { plStatusEl.textContent = "Match error: " + e; }
+};
+
+// ---------- All Combos ----------
+const cbSearchEl = document.getElementById("cbSearch");
+const cbCatEl = document.getElementById("cbCat");
+const cbCountEl = document.getElementById("cbCount");
+const cbListEl = document.getElementById("cbList");
+function fmtVal(r) {
+  if (r.value == null) return r.random ? "random" : "—";
+  return "~" + r.value + " " + (r.valueCur || "");
+}
+function renderCombos() {
+  const q = cbSearchEl.value.trim().toLowerCase();
+  const cat = cbCatEl.value;
+  const arr = allRecipes.filter((r) =>
+    (cat === "all" || r.category === cat) &&
+    (!q || (r.reward + " " + r.runes.join(" ")).toLowerCase().includes(q)));
+  arr.sort((a, b) =>
+    String(a.category).localeCompare(b.category) ||
+    (b.value || 0) - (a.value || 0) ||
+    a.reward.localeCompare(b.reward));
+  cbCountEl.textContent = arr.length + " combination" + (arr.length === 1 ? "" : "s") +
+    "  ·  click a rune name in Rune Planner to find it here";
+  cbListEl.innerHTML = arr.map((r) => {
+    const runes = r.runes.map(runeShort).join(" · ");
+    const qbadge = r.qty > 1 ? `<span class="rq">${r.qty}×</span>` : "";
+    const boon = /boon$/i.test(r.reward) ? `<span class="boonb">BOON</span>` : "";
+    return `<div class="pr">${qbadge}<span class="rname">${esc(r.reward)}<span class="sub">${esc(runes)}</span></span>${boon}<span class="ctag">${esc(r.category || "")}</span>${dgrHtml(r.danger)}<span class="rprice">${esc(fmtVal(r))}</span></div>`;
+  }).join("") || `<div class="empty">No combination matches.</div>`;
+}
+cbSearchEl.oninput = renderCombos;
+cbCatEl.onchange = renderCombos;
+
 boot();
+initPlanner();
 </script>
 </body>
 </html>
