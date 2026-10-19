@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("api", {
   setSoundAlert: (on) => ipcRenderer.invoke("set-sound-alert", on),
   setHideNames: (on) => ipcRenderer.invoke("set-hide-names", on),
   setMinValue: (v) => ipcRenderer.invoke("set-min-value", v),
+  setFont: (f) => ipcRenderer.invoke("set-font", f),
   selectRegion: () => ipcRenderer.invoke("select-region"),
   refreshPrices: () => ipcRenderer.invoke("refresh-prices"),
   // Rune Planner
@@ -26,5 +27,6 @@ contextBridge.exposeInMainWorld("api", {
   onAlert: (cb) => ipcRenderer.on("alert", (_e, data) => cb(data)),
   onOverlayState: (cb) => ipcRenderer.on("overlay-state", (_e, on) => cb(on)),
   onRuneOverlayState: (cb) => ipcRenderer.on("rune-overlay-state", (_e, on) => cb(on)),
+  onFont: (cb) => ipcRenderer.on("app-font", (_e, f) => cb(f)),
   sendRegion: (region) => ipcRenderer.send("region-selected", region),
 });

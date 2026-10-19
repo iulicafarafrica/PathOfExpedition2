@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, nativeImage, shell, globalShortcut, clipboard } = require("electron");
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, nativeImage, shell, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -281,11 +281,22 @@ function isNewerVer(latest, current) {
   return false;
 }
 
+// fetch cu timeout (AbortController): o retea lenta/agatata nu blocheaza pornirea
+async function fetchT(url, opts = {}, ms = 15000) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ac.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function checkUpdate() {
   try {
-    const r = await fetch(GITHUB_API_LATEST, {
+    const r = await fetchT(GITHUB_API_LATEST, {
       headers: { "User-Agent": NINJA_UA, "Accept": "application/vnd.github+json" },
-    });
+    }, 10000);
     if (r.status === 404) return { ok: true, updateAvailable: false, reason: "no-releases" };
     if (!r.ok) return { ok: false, status: r.status };
     const j = await r.json();
@@ -449,7 +460,7 @@ async function fetchPrices(league) {
   const tasks = NINJA_TYPES.map(async (type) => {
     const url = `${NINJA_BASE}/exchange/current/overview?league=${encodeURIComponent(league)}&type=${encodeURIComponent(type)}`;
     try {
-      const r = await fetch(url, { headers });
+      const r = await fetchT(url, { headers }, 20000);
       if (!r.ok) { log("fetchPrices:", type, "HTTP", r.status); return []; }
       const j = await r.json();
       // moneda primara a ligii + rate-urile. rates[x] = cate x = 1 unitate primara.
@@ -649,7 +660,7 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 function loadConfig() {
-  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false };
+  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false, font: "georgia" };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
     log("loadConfig: citit", raw.length, "chari");
@@ -1196,7 +1207,19 @@ ipcMain.handle("set-hide-names", (_e, on) => {
   sendOverlay(lastScanPayload);   // re-trimite catre overlay ca sa aplice schimbarea
   return { ok: true, hideNames: config.hideNames };
 });
-
+// fontul UI (token din FontUI.TOKENS): persistat + trimis live la ambele overlay-uri
+function pushFontToOverlays() {
+  if (overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send("app-font", config.font);
+  if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.webContents.send("app-font", config.font);
+}
+ipcMain.handle("set-font", (_e, f) => {
+  const id = String(f || "");
+  const known = ["georgia", "segoe", "cambria", "consolas", "verdana", "tahoma", "trebuchet", "times", "courier", "arial", "norse"];
+  config.font = known.includes(id) ? id : "georgia";
+  saveConfig();
+  pushFontToOverlays();
+  return { ok: true, font: config.font };
+});
 // flux comun de selectare region; kind = "scan" (regiunea de preturi) | "rune" (iconitele de rune)
 function selectRegionFlow(kind) {
   selectOpen = true;   // nu fac scan cat timp box-ul e deschis
@@ -1260,72 +1283,24 @@ function selectRegionFlow(kind) {
 ipcMain.handle("select-region", () => selectRegionFlow("scan"));
 ipcMain.handle("select-rune-region", () => selectRegionFlow("rune"));
 
-// ---------- hotkeys globale (functioneaza si cand jocul e in focus) ----------
-// Ctrl+Alt+O: overlay on/off | Ctrl+Alt+R: rescan | Ctrl+Alt+C: copiaza pretul
-// itemului cel mai valoros de pe ecran | Ctrl+Alt+T: deschide pagina itemului (poe.ninja).
-const HOTKEYS = [
-  ["Control+Alt+O", "overlay"],
-  ["Control+Alt+R", "rescan"],
-  ["Control+Alt+C", "copy-price"],
-  ["Control+Alt+T", "open-item"],
-];
-function notifyOverlayState() {
-  if (win && !win.isDestroyed()) win.webContents.send("overlay-state", config.overlay === true);
-}
-function copyTopPrice() {
-  const r = topRow();
-  if (!r) { log("hotkey copy: nimic de copiat"); return null; }
-  const name = r.matchedName || r.name;
-  const qty = r.qty || 1;
-  const price = (r.display && r.display.text) || r.dispTotal || r.dispUnit || "?";
-  const text = `${qty}x ${name} — ${price}`;
-  clipboard.writeText(text);
-  log("hotkey copy:", text);
-  return text;
-}
-function registerHotkeys() {
-  for (const [accel, action] of HOTKEYS) {
-    let ok = false;
-    try {
-      ok = globalShortcut.register(accel, () => {
-        try {
-          if (action === "overlay") {
-            const res = toggleOverlay(!(overlayWin && !overlayWin.isDestroyed()));
-            notifyOverlayState();
-            log("hotkey overlay ->", res.on);
-          } else if (action === "rescan") {
-            log("hotkey rescan"); runScan(true);
-          } else if (action === "copy-price") {
-            copyTopPrice();
-          } else if (action === "open-item") {
-            const r = topRow();
-            if (r) openItemPage(r);
-          }
-        } catch (e) { log("hotkey error", action, e.message || e); }
-      });
-    } catch (e) { log("hotkey: eroare la inregistrare", accel, e.message || e); }
-    if (!ok) log("hotkey: nu pot inregistra", accel, "(probabil ocupat de alta aplicatie)");
-    else log("hotkey inregistrat:", accel, "->", action);
-  }
-}
-
 // securitate: aplicația e doar local - blocam navigarea externa si crearea de ferestre
 app.on("web-contents-created", (_e, contents) => {
   contents.on("will-navigate", (event) => event.preventDefault());
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
 });
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   createWindow();
-  registerHotkeys();   // Ctrl+Alt+O/R/C/T (functioneaza si peste joc)
-  // incarca preturile la pornire (nu blocheaza UI)
-  try { await fetchPrices(config.league || "Forbidden Rites"); } catch {}
-  // daca regiunea e deja salvata, porneste scanarea automata (fara buton Start)
+  // pornim scanarea + overlay-urile IMEDIAT (fara sa asteptam preturile), ca
+  // aplicatia sa se simta deschisa din prima; preturile se incarca in background
   if (config.region) startPoll();
   // repune overlay-ul daca era pornit la ultima rulare
   if (config.overlay) toggleOverlay(true);
   // si overlay-ul de rune (ca peste buton sa fie mereu ON/OFF corect cu fereastra)
   if (config.runeOverlay && config.runeRegion) toggleRuneOverlay(true);
+  // preturile: in background (cu timeout), NU blocheaza deschiderea ferestrelor.
+  // primul scan (la 3s) le prinde deja incarcate; pana atunci itemele arata "unknown".
+  fetchPrices(config.league || "Forbidden Rites").catch(() => {});
   // auto-refresh preturi la 30 min
   setInterval(async () => {
     try {
@@ -1341,7 +1316,6 @@ app.whenReady().then(async () => {
   }, 5 * 60 * 1000);
 });
 app.on("window-all-closed", () => app.quit());
-app.on("will-quit", () => { try { globalShortcut.unregisterAll(); } catch {} });
 
 // prinde erorile nemanagite ca sa vedem exact unde e bug-ul
 process.on("uncaughtException", (e) => {

@@ -31,14 +31,14 @@
   html, body { height:100%; }
   body {
     margin:0;
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--ui-font, Georgia, "Times New Roman", serif);
     color: var(--ink);
     background:
       radial-gradient(ellipse at 50% 0%, #e7d9b6 0%, #cbb890 60%, #b49b6e 100%);
   }
   .wrap { padding:10px 12px; display:flex; flex-direction:column; gap:7px; min-height:100%; }
   h1 {
-    font-family: "Norse", Georgia, serif;
+    font-family: var(--ui-font, "Norse", Georgia, serif);
     font-size:21px; margin:0; text-align:center; letter-spacing:.5px;
     color:var(--ink); text-shadow:0 1px 0 rgba(255,255,255,.35);
   }
@@ -53,6 +53,19 @@
   }
   button:hover, select:hover { background:linear-gradient(#e2d4ae, var(--btn-hi)); }
   button:active { box-shadow:inset 0 1px 3px rgba(0,0,0,.35); }
+  .opt-wrap { position: relative; display: inline-block; }
+  .opt-menu {
+    position:absolute; top:100%; right:0; margin-top:4px; z-index:40;
+    min-width:214px; padding:8px; display:flex; flex-direction:column; gap:6px;
+    background:#efe3c4; border:1px solid var(--line); border-radius:5px;
+    box-shadow:0 6px 18px rgba(0,0,0,.4);
+  }
+  .opt-menu[hidden] { display:none; }
+  .opt-row { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; font-weight:bold; }
+  .opt-row select { font-size:12px; min-width:130px; }
+  .opt-item { text-align:left; font-weight:normal; background:linear-gradient(#efe3c4, #e2d4ae); }
+  .opt-item:hover { background:linear-gradient(#f5ecd2, var(--btn-hi)); }
+  .opt-div { height:1px; background:var(--line); opacity:.5; margin:1px 0; }
   button.on { background:linear-gradient(#b7d9a0, #9cc47e); }
   .status { font-size:12px; color:var(--ink-soft); text-align:center; min-height:14px; font-style:italic; }
   .list {
@@ -223,10 +236,17 @@
     <button id="snd">Alert: OFF</button>
     <button id="nm">Names: ON</button>
     <button id="scan">Scan now</button>
-    <button id="ref">Refresh prices</button>
-    <button id="chk">Check OCR</button>
-    <button id="upd">Update</button>
-    <button id="dbg">Debug</button>
+    <span class="opt-wrap">
+      <button id="optBtn" title="Font, refresh prices, check OCR, update, debug">⚙ Options</button>
+      <div id="optMenu" class="opt-menu" hidden>
+        <label class="opt-row">Font <select id="fontSel"></select></label>
+        <div class="opt-div"></div>
+        <button id="optRefresh" class="opt-item">Refresh prices</button>
+        <button id="optOcr" class="opt-item">Check OCR</button>
+        <button id="optUpdate" class="opt-item">Update</button>
+        <button id="optDebug" class="opt-item">Debug</button>
+      </div>
+    </span>
   </div>
   <div id="updBanner" class="upd-banner" hidden></div>
   <div id="status" class="status">Loading…</div>
@@ -272,6 +292,7 @@
     <a id="bmc">☕ Buy me a coffee</a>
   </div>
 </div>
+<script src="fontui.js"></script>
 <script src="runereader.js"></script>
 <script>
 const statusEl = document.getElementById("status");
@@ -399,6 +420,8 @@ async function boot() {
   setNmBtn(!cfg.hideNames);
   minDiv = cfg.minDivine || 0;
   minvalEl.value = String(minDiv);
+  fontSel.value = cfg.font || FontUI.DEFAULT;
+  FontUI.apply(fontSel.value);   // font salvat (aplicat si pe overlay-uri la pornire)
   document.getElementById("ver").textContent = "v" + (cfg.version || "?");
   statusEl.textContent = cfg.region ? "Region set. Scanning automatically." : "Choose a region first (Select region).";
   checkUpdateNow(true); // fire-and-forget, silent
@@ -447,21 +470,37 @@ minvalEl.onchange = async () => {
   render(curRows, null);   // aplica pragul imediat, fara re-scan
   statusEl.textContent = minDiv > 0 ? `Hiding items below ${minDiv} div.` : "Showing all items.";
 };
+
+// ---------- Options (meniu dropdown: font + actiuni utilitare) ----------
+const optBtn = document.getElementById("optBtn");
+const optMenu = document.getElementById("optMenu");
+const fontSel = document.getElementById("fontSel");
+fontSel.innerHTML = FontUI.TOKENS.map((t) => `<option value="${t.id}">${t.label}</option>`).join("");
+function closeOpt() { optMenu.hidden = true; }
+optBtn.onclick = (e) => { e.stopPropagation(); optMenu.hidden = !optMenu.hidden; };
+optMenu.onclick = (e) => e.stopPropagation();   // click in meniu nu-l inchide
+document.addEventListener("click", () => closeOpt());
+fontSel.onchange = async () => {
+  const r = await window.api.setFont(fontSel.value);
+  if (r && r.ok) { FontUI.apply(r.font); statusEl.textContent = "Font: " + FontUI.byId(r.font).label + "."; }
+};
+window.api.onFont((f) => { FontUI.apply(f); fontSel.value = f; });
 document.getElementById("scan").onclick = async () => {
   statusEl.textContent = "Scanning…";
   const r = await window.api.scanNow();
   render(r.rows, r.error);
   statusEl.textContent = `Done: ${r.rows.length} rows.`;
 };
-document.getElementById("ref").onclick = async () => {
+document.getElementById("optRefresh").onclick = async () => {
   statusEl.textContent = "Loading prices…";
   const r = await window.api.refreshPrices();
   if (r.at) setPricesTime(r.at, r.stale);
   statusEl.textContent = r.ok
     ? (r.stale ? `poe.ninja unreachable — showing cached prices (${r.count} items).` : `Prices updated: ${r.count} items.`)
     : `Error: ${r.error}`;
+  closeOpt();
 };
-document.getElementById("chk").onclick = async () => {
+document.getElementById("optOcr").onclick = async () => {
   statusEl.textContent = "Checking Windows OCR…";
   const r = await window.api.checkOcr();
   if (r.ok && r.engine) {
@@ -472,6 +511,7 @@ document.getElementById("chk").onclick = async () => {
   } else {
     statusEl.textContent = "OCR check failed: " + (r.error || "unknown");
   }
+  closeOpt();
 };
 document.getElementById("bmc").onclick = () => {
   window.api.openExternal("https://buymeacoffee.com/iulian.icb");
@@ -480,7 +520,7 @@ document.getElementById("bmc").onclick = () => {
 // ---------- update (GitHub Releases) ----------
 let updateInfo = null; // { latest, current, releaseUrl, assets } cand e disponibil
 const updBanner = document.getElementById("updBanner");
-const updBtn = document.getElementById("upd");
+const updBtn = document.getElementById("optUpdate");
 
 async function checkUpdateNow(silent) {
   try {
@@ -515,9 +555,11 @@ updBtn.onclick = async () => {
   updBtn.disabled = false;
   if (r.ok) statusEl.textContent = `Update launched: ${r.name}. Close this version.`;
   else statusEl.textContent = "Update failed: " + r.error;
+  closeOpt();
 };
-document.getElementById("dbg").onclick = () => {
+document.getElementById("optDebug").onclick = () => {
   window.api.openDebug();
+  closeOpt();
 };
 
 window.api.onScan((data) => {

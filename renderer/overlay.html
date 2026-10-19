@@ -24,7 +24,7 @@
     position: absolute; left: 0;
     display: flex; align-items: baseline; gap: 7px;
     width: max-content; max-width: calc(100% - 4px);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--ui-font, Georgia, "Times New Roman", serif);
     font-size: 14px; white-space: nowrap;
     color: #ead9a8;
     background: rgba(6, 5, 4, .96);
@@ -58,7 +58,7 @@
     position: absolute; left: 0; bottom: 3px;
     display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
     width: max-content; max-width: calc(100% - 4px);
-    font-family: Georgia, "Times New Roman", serif;
+    font-family: var(--ui-font, Georgia, "Times New Roman", serif);
     font-size: 11px; line-height: 1.25; white-space: nowrap; color: #b7a67c;
     background: rgba(6, 5, 4, .86);
     border: 1px solid rgba(214, 198, 156, .32);
@@ -83,6 +83,7 @@
   <div class="lg"><b class="pump">▲</b> spike (big rise, 15%+)</div>
   <div class="lg"><svg width="26" height="12" viewBox="0 0 26 12"><polyline points="1,10 5,6 9,8 13,3 17,5 21,2 25,4" fill="none" stroke="#cbbc92" stroke-width="1.3" stroke-linejoin="round"/></svg> 7-day price history</div>
 </div>
+<script src="fontui.js"></script>
 <script>
 const chipsEl = document.getElementById("chips");
 const legendEl = document.getElementById("legend");
@@ -139,6 +140,10 @@ function render(data) {
 
 // overlay pur informativ: fereastra e mereu click-through, fara forward,
 // deci nu intercepteaza mouse-ul si nu introduce lag in joc.
+
+// fontul ales in Options: citim la pornire + primim live prin "app-font"
+window.api.getConfig().then((c) => FontUI.apply((c && c.font) || FontUI.DEFAULT)).catch(() => {});
+window.api.onFont((f) => FontUI.apply(f));
 
 // acelasi canal "scan" ca fereastra principala (preload expune onScan)
 window.api.onScan(render);
