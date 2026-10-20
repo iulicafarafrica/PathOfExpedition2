@@ -14,7 +14,7 @@
     position: absolute; left: 0;
     display: flex; align-items: flex-start; gap: 8px;
     width: max-content; max-width: calc(100% - 4px);
-    font-family: var(--ui-font, Georgia, "Times New Roman", serif);
+    font-family: var(--ui-font, "Segoe UI", Tahoma, sans-serif);
     font-size: 13px; white-space: nowrap;
     color: #ead9a8;
     background: rgba(6, 5, 4, .96);
@@ -41,16 +41,17 @@
   .jk { color: #f2c14e; }
   #hint {
     position: absolute; left: 0; top: 0;
-    font-family: var(--ui-font, Georgia, "Times New Roman", serif); font-size: 12px; color: #cbbc92;
+    font-family: var(--ui-font, "Segoe UI", Tahoma, sans-serif); font-size: 12px; color: #cbbc92;
     background: rgba(6, 5, 4, .9); border: 1px solid rgba(214, 198, 156, .35);
     border-radius: 5px; padding: 3px 9px; white-space: nowrap; max-width: calc(100% - 4px);
     text-shadow: 0 1px 2px rgba(0, 0, 0, .9);
   }
-  /* legenda de orientare: apare cand se porneste overlay-ul si dispare dupa 20s
-     (fara display in CSS ca sa nu copleseasca atributul hidden, ca in overlay.html) */
+  /* legenda de orientare: apare DOAR cand exista randuri detectate (ca la overlay-ul
+     de preturi), jos, ca sa nu acopere primul rand. Fara display in CSS ca sa nu
+     copleseasca atributul hidden. */
   #legend {
-    position: absolute; left: 0; top: 0; z-index: 5;
-    font-family: var(--ui-font, Georgia, "Times New Roman", serif); font-size: 10px; line-height: 1.45;
+    position: absolute; left: 0; bottom: 3px; z-index: 5;
+    font-family: var(--ui-font, "Segoe UI", Tahoma, sans-serif); font-size: 10px; line-height: 1.45;
     color: #cbbc92; background: rgba(6, 5, 4, .92); border: 1px solid rgba(214, 198, 156, .35);
     border-radius: 5px; padding: 4px 8px; white-space: nowrap; max-width: calc(100% - 4px);
     text-shadow: 0 1px 2px rgba(0, 0, 0, .95);
@@ -62,7 +63,7 @@
 <body>
 <div id="rows"></div>
 <div id="hint" hidden></div>
-<div id="legend"><b>DANGER n/m</b> — monster danger of this row (higher = harder)<br><b>Spread → X</b> — keep 1 copy of X for later Remnants · <b>★</b> — jackpot / permanent Boon</div>
+<div id="legend" hidden><b>DANGER n/m</b> — monster danger of this row (higher = harder)<br><b>Spread → X</b> — keep 1 copy of X for later Remnants · <b>★</b> — jackpot / permanent Boon</div>
 <script src="fontui.js"></script>
 <script src="runereader.js"></script>
 <script>
@@ -76,10 +77,7 @@ let chaseList = [];      // { name, set:Set(norm), total } pt progresul "3/9"
 const nn = (s) => String(s).toLowerCase().replace(/\s+rune$/, "");
 let running = false;
 let lastPaint = "";
-// cand panoul din joc e inchis (fara randuri), hint-ul ramane afisat doar cateva
-// secunde, apoi dispare - sa nu mai stea "legenda" peste ecran cand joaci.
-let noRowsSince = 0;
-const NO_ROWS_HINT_MS = 5000;
+let lastFrame = "";
 
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function short(n) { return String(n).replace(/\s*Rune$/i, ""); }
@@ -87,8 +85,13 @@ function key(names) { return names.slice().sort().join("|"); }
 function showHint(msg) {
   hintEl.hidden = false;
   hintEl.textContent = msg;
-  // nu suprapune hint-ul peste legenda de orientare (ambele sunt sus, la pornire)
-  hintEl.style.top = legendEl.hidden ? "0" : "48px";
+}
+// nimic pe ecran: fara randuri, fara legenda, fara hint (ca la overlay-ul de preturi)
+function clearAll() {
+  if (lastPaint) { rowsEl.innerHTML = ""; lastPaint = ""; }
+  legendEl.hidden = true;
+  hintEl.hidden = true;
+  lastFrame = "";
 }
 
 function rowHtml(det, y) {
@@ -147,29 +150,40 @@ async function tick() {
   if (running || document.hidden) return;
   running = true;
   try {
-    const cap = await window.api.captureRunes();
-    if (!cap || !cap.ok) { rowsEl.innerHTML = ""; lastPaint = ""; showHint((cap && cap.error) || "Set the rune region first."); return; }
-    const rows = await RuneReader.detectRows(cap.dataUrl, cap.scale);
+    // un singur round-trip in main: foreground (jocul e in fata?) + captura rapida GDI
+    const f = await window.api.runeFrame();
+    if (!f || !f.ok) { clearAll(); showHint((f && f.error) || "Rune overlay unavailable."); return; }
+    // ca la overlay-ul de preturi (care cere ancorul OCR "Runeshape Combinations"):
+    // desenam doar cand jocul e fereastra activa - altfel potrivirea iconitelor
+    // poate "recunoaste" rune pe desktop/wallpaper/alte aplicatii.
+    if (!f.isGame) { clearAll(); return; }
+    hintEl.hidden = true;
+    // cadru identic cu cel anterior -> nu re-facem template-matching-ul
+    if (f.dataUrl === lastFrame) return;
+    lastFrame = f.dataUrl;
+    const rows = await RuneReader.detectRows(f.dataUrl, f.scale);
     // doar randuri cu incredere mare (panoul Runeshape deschis); pamantul/obiectele
     // raman sub prag si nu mai apar ca randuri de rune.
     const good = rows.filter((r) => r.ok);
+    // fara randuri reale nu se deseneaza NIMIC (nici legenda, nici hint)
+    legendEl.hidden = good.length === 0;
     if (!good.length) {
-      rowsEl.innerHTML = ""; lastPaint = "";
-      // hint de orientare doar cateva secunde de la stare (panoul inchis nu mai
-      // lasa text ramas pe ecran)
-      if (!noRowsSince) noRowsSince = Date.now();
-      if (Date.now() - noRowsSince < NO_ROWS_HINT_MS) showHint("No rune rows detected \u2014 box the panel (or ONE row) again.");
-      else hintEl.hidden = true;
+      if (lastPaint) { rowsEl.innerHTML = ""; lastPaint = ""; }
       return;
     }
-    noRowsSince = 0;
-    hintEl.hidden = true;
-    const k = cap.scale > 0 ? cap.scale : 1;
+    const k = f.scale > 0 ? f.scale : 1;
     const html = good.map((r) => rowHtml(r.det, Math.max(0, Math.round(r.cy / k) - 17))).join("");
     if (html !== lastPaint) { rowsEl.innerHTML = html; lastPaint = html; }
   } catch (e) {
     // nu spamam; revine la urmatorul tick
   } finally { running = false; }
+}
+
+// bucla adaptiva: cat timp se vad randuri, reverificam des (~250ms) ca overlay-ul sa
+// dispara imediat cand se inchide panoul; cand nu e nimic afisat, rarim (~900ms).
+async function loop() {
+  await tick();
+  setTimeout(loop, lastPaint ? 250 : 900);
 }
 
 (async () => {
@@ -191,10 +205,8 @@ async function tick() {
       await RuneReader.init(d.runes);
     }
   } catch {}
-  // legenda de orientare: vizibila la pornire, apoi dispare singura
-  setTimeout(() => { legendEl.hidden = true; }, 20000);
-  tick();
-  setInterval(tick, 2000);
+  // legenda de orientare ramane ascunsa pana la primul rand detectat (vezi tick)
+  loop();
 })();
 
 // fontul ales in Options: citim la pornire + primim live prin "app-font"

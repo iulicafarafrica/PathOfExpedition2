@@ -31,19 +31,21 @@
   html, body { height:100%; }
   body {
     margin:0;
-    font-family: var(--ui-font, Georgia, "Times New Roman", serif);
+    font-family: var(--ui-font, "Segoe UI", Tahoma, sans-serif);
     color: var(--ink);
     background:
       radial-gradient(ellipse at 50% 0%, #e7d9b6 0%, #cbb890 60%, #b49b6e 100%);
   }
   .wrap { padding:10px 12px; display:flex; flex-direction:column; gap:7px; min-height:100%; }
   h1 {
-    font-family: var(--ui-font, "Norse", Georgia, serif);
-    font-size:21px; margin:0; text-align:center; letter-spacing:.5px;
+    font-family: var(--ui-font, "Segoe UI", Tahoma, sans-serif);
+    font-size:17px; margin:0; text-align:left; letter-spacing:.3px;
     color:var(--ink); text-shadow:0 1px 0 rgba(255,255,255,.35);
   }
-  .btns { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; align-items:center; }
-  .corelbl { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:bold; }
+  .btns { display:flex; gap:3px; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .corelbl { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:bold; }
+  .btns button, .btns select { padding:3px 7px; font-size:11px; }
+  #minval { width:72px; }
   button, select {
     font-family:inherit; font-size:12px; font-weight:bold; color:var(--ink);
     background:linear-gradient(#d8c89e, var(--btn));
@@ -115,8 +117,6 @@
     text-shadow:0 1px 1px rgba(0,0,0,.35);
   }
   .footer a#bmc:hover { background:linear-gradient(#dd9f4e, #b8761e); text-decoration:none; }
-  .hk { font-size:10px; color:var(--ink-soft); text-align:center; padding:3px 0 0; line-height:1.5; }
-  .hk b { color:var(--ink); font-weight:bold; }
   .priceline { color:var(--ink-soft); }
   .upd-banner {
     text-align:center; font-size:12px; font-weight:bold; cursor:pointer;
@@ -125,15 +125,22 @@
     box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
   .upd-banner:hover { text-decoration:underline; }
-  /* ---------- tabs ---------- */
-  .tabs { display:flex; gap:4px; justify-content:center; }
+  /* ---------- header: titlu + tab-uri (underline) + gear ---------- */
+  .appbar { display:flex; align-items:center; gap:10px; }
+  .tabs { flex:1; display:flex; gap:2px; justify-content:center; align-items:center; }
   .tab {
-    font-family:inherit; font-size:12px; font-weight:bold; color:var(--ink);
-    background:linear-gradient(#d0be94, #bda878);
-    border:1px solid var(--line); border-bottom:0; border-radius:4px 4px 0 0;
-    padding:5px 14px; cursor:pointer; opacity:.72;
+    font-family:inherit; font-size:13px; font-weight:bold; color:var(--ink);
+    background:none; border:0; border-bottom:2px solid transparent;
+    padding:5px 10px 4px; cursor:pointer; opacity:.55; border-radius:0;
   }
-  .tab.active { background:linear-gradient(#e0d1ad, #d3c19a); opacity:1; }
+  .tab:hover { opacity:.85; }
+  .tab.active { opacity:1; border-bottom-color:var(--gold); }
+  .gear {
+    flex:0 0 auto; width:28px; height:28px; padding:0; font-size:15px; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .sep { width:1px; height:18px; background:var(--line); opacity:.45; margin:0 2px; }
+  button.primary { background:linear-gradient(#e7cf8f, #d4b463); }
   .panel { display:flex; flex-direction:column; gap:7px; flex:1; min-height:0; }
   .panel[hidden] { display:none; }
   /* ---------- Rune Planner ---------- */
@@ -211,12 +218,28 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Path of Expedition</h1>
-  <div class="tabs">
-    <div class="tab active" id="tabBtnPrices">Prices</div>
-    <div class="tab" id="tabBtnPlanner">Rune Planner</div>
-    <div class="tab" id="tabBtnCombos">All Combos</div>
-  </div>
+  <header class="appbar">
+    <h1>Path of Expedition</h1>
+    <nav class="tabs">
+      <div class="tab active" id="tabBtnPrices">Prices</div>
+      <div class="tab" id="tabBtnPlanner">Rune Planner</div>
+      <div class="tab" id="tabBtnCombos">All Combos</div>
+    </nav>
+    <span class="opt-wrap">
+      <button id="optBtn" class="gear" title="Options: font, refresh prices, check OCR, update, debug">⚙</button>
+      <div id="optMenu" class="opt-menu" hidden>
+        <label class="opt-row">Font <select id="fontSel"></select></label>
+        <div class="opt-div"></div>
+        <button id="snd" class="opt-item">Alert: OFF</button>
+        <button id="nm" class="opt-item">Names: ON</button>
+        <div class="opt-div"></div>
+        <button id="optRefresh" class="opt-item">Refresh prices</button>
+        <button id="optOcr" class="opt-item">Check OCR</button>
+        <button id="optUpdate" class="opt-item">Update</button>
+        <button id="optDebug" class="opt-item">Debug</button>
+      </div>
+    </span>
+  </header>
   <div id="tab-prices" class="panel">
   <div class="btns">
     <label class="corelbl">League:
@@ -231,22 +254,11 @@
         <option value="10">≥10 div</option>
       </select>
     </label>
+    <span class="sep"></span>
     <button id="sel">Select region</button>
     <button id="ovl">Overlay: OFF</button>
-    <button id="snd">Alert: OFF</button>
-    <button id="nm">Names: ON</button>
-    <button id="scan">Scan now</button>
-    <span class="opt-wrap">
-      <button id="optBtn" title="Font, refresh prices, check OCR, update, debug">⚙ Options</button>
-      <div id="optMenu" class="opt-menu" hidden>
-        <label class="opt-row">Font <select id="fontSel"></select></label>
-        <div class="opt-div"></div>
-        <button id="optRefresh" class="opt-item">Refresh prices</button>
-        <button id="optOcr" class="opt-item">Check OCR</button>
-        <button id="optUpdate" class="opt-item">Update</button>
-        <button id="optDebug" class="opt-item">Debug</button>
-      </div>
-    </span>
+    <span class="sep"></span>
+    <button id="scan" class="primary">Scan now</button>
   </div>
   <div id="updBanner" class="upd-banner" hidden></div>
   <div id="status" class="status">Loading…</div>
@@ -286,7 +298,6 @@
     <div class="mini" id="cbCount"></div>
     <div id="cbList" class="plist cb-list"></div>
   </div><!-- /tab-combos -->
-  <div class="hk"><b>Ctrl+Alt+O</b> overlay · <b>Ctrl+Alt+R</b> rescan · <b>Ctrl+Alt+C</b> copy price · <b>Ctrl+Alt+T</b> item page</div>
   <div class="footer">
     <span>made by iulian.icb · <span id="ver">v—</span> · <span id="pricesTime" class="priceline">Prices updated: —</span></span>
     <a id="bmc">☕ Buy me a coffee</a>
@@ -363,11 +374,13 @@ function sparkSvg(data, trend) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
 }
 
-function render(rows, error) {
+function render(rows, error, panelMissing) {
   curRows = error ? [] : rows;
   if (error) { listEl.innerHTML = `<div class="err">${esc(error)}</div>`; return; }
   // cu overlay pornit, lista dispare complet din fereastra - totul se afiseaza doar in overlay
   if (overlayOn) { listEl.innerHTML = `<div class="empty">Prices are shown in the in-game overlay.</div>`; return; }
+  // nu suntem pe panoul Runeshaping (ex. suntem in market) -> mesaj clar, nu lista goala
+  if (panelMissing) { listEl.innerHTML = `<div class="empty">Runeshaping panel not detected — open Runeshape Combinations in game.</div>`; return; }
   // prag de valoare: ascundem itemele sub minDiv (in Divine)
   const shown = rows.filter((r) => (r.totalDivine || 0) >= minDiv);
   if (!shown.length) {
@@ -406,7 +419,7 @@ leagueEl.onchange = async () => {
   const cfg = await window.api.getConfig();
   setPricesTime(cfg.pricesAt, cfg.pricesStale);
   const r = await window.api.scanNow();
-  render(r.rows, r.error);
+  render(r.rows, r.error, r.panelMissing);
 };
 
 async function boot() {
@@ -488,7 +501,7 @@ window.api.onFont((f) => { FontUI.apply(f); fontSel.value = f; });
 document.getElementById("scan").onclick = async () => {
   statusEl.textContent = "Scanning…";
   const r = await window.api.scanNow();
-  render(r.rows, r.error);
+  render(r.rows, r.error, r.panelMissing);
   statusEl.textContent = `Done: ${r.rows.length} rows.`;
 };
 document.getElementById("optRefresh").onclick = async () => {
@@ -553,7 +566,9 @@ updBtn.onclick = async () => {
   updBtn.disabled = true;
   const r = await window.api.doUpdate(); // assetul e ales in main process
   updBtn.disabled = false;
-  if (r.ok) statusEl.textContent = `Update launched: ${r.name}. Close this version.`;
+  if (r.ok) statusEl.textContent = r.mode === "installer"
+    ? `Installer launched: ${r.name}. Confirm closing the app to finish the update.`
+    : `Update downloaded: ${r.name}. Restarting...`;
   else statusEl.textContent = "Update failed: " + r.error;
   closeOpt();
 };
@@ -564,7 +579,7 @@ document.getElementById("optDebug").onclick = () => {
 
 window.api.onScan((data) => {
   if (data.pricesAt) setPricesTime(data.pricesAt, data.pricesStale);
-  render(data.rows, data.error);
+  render(data.rows, data.error, data.panelMissing);
 });
 
 // alerta sonora: item nou de la 1 Divine in sus
@@ -576,12 +591,6 @@ window.api.onAlert((d) => {
     : "Alert: new item worth 1 Divine or more.";
 });
 
-// overlay pornit/oprit din hotkey global (Ctrl+Alt+O): sincronizam butonul din UI
-window.api.onOverlayState((on) => {
-  setOvlBtn(on);
-  render(curRows, null);
-  statusEl.textContent = on ? "Overlay on (hotkey)." : "Overlay off (hotkey).";
-});
 
 // ---------- tabs ----------
 function showTab(which) {

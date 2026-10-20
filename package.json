@@ -1,12 +1,13 @@
 {
   "name": "path-of-expedition",
-  "version": "1.1.11",
+  "version": "1.1.13",
   "private": true,
   "description": "PoE2 Expedition Runeshape price checker",
   "main": "main.js",
   "author": "iulian.icb",
   "scripts": {
     "start": "electron .",
+    "test": "node test/run.js",
     "dist": "electron-builder"
   },
   "devDependencies": {
@@ -30,6 +31,10 @@
       "icon": "build/icon.ico",
       "target": ["portable", "nsis"]
     },
+    "portable": {
+      "unpackDirName": "PathOfExpedition"
+    },
+    "electronLanguages": ["en-US"],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true

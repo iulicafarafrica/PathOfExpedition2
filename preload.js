@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("api", {
   plannerData: () => ipcRenderer.invoke("planner-data"),
   planRecipes: (runes) => ipcRenderer.invoke("plan-recipes", runes),
   captureRunes: () => ipcRenderer.invoke("capture-runes"),
+  runeFrame: () => ipcRenderer.invoke("rune-frame"),
   selectRuneRegion: () => ipcRenderer.invoke("select-rune-region"),
   toggleRuneOverlay: (on) => ipcRenderer.invoke("toggle-rune-overlay", on),
   onScan: (cb) => ipcRenderer.on("scan", (_e, data) => cb(data)),

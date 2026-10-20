@@ -10,6 +10,22 @@ const planner = require("./planner");
 // alertele sonore pornesc fara gest de utilizator (altfel AudioContext-ul din renderer e blocat)
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
+// ---------- single instance ----------
+// o singura instanta in rulare: a doua pornire nu mai merge mai departe (previne
+// rulare dubla + lock-uri de fisier pe dist). Fereastra existenta: o aduci in focus.
+const isSingleInstance = app.requestSingleInstanceLock();
+if (!isSingleInstance) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+  });
+}
+
 // ---------- logging ----------
 const LOG_FILE = path.join(os.tmpdir(), "xpc-debug.log");
 let logLines = [];        // buffer circular de loguri (pt fereastra Debug)
@@ -129,7 +145,7 @@ function ocrScriptPath() {
   if (ocrScriptTmp === target && fs.existsSync(target)) return target;
   if (!fs.existsSync(target)) {
     try { fs.writeFileSync(target, OCR_PS1, "utf8"); }
-    catch (e) { log("ocrScriptPath: nu pot scrie scriptul OCR:", target, String(e)); }
+    catch (e) { log("ocrScriptPath: cannot write OCR script:", target, String(e)); }
   }
   if (fs.existsSync(target)) ocrScriptTmp = target;
   // curatenie best-effort: eliminam versiunile vechi de script (pot fi blocate -> ignoram)
@@ -146,7 +162,7 @@ function ensureOcrProc() {
   if (ocrProc && !ocrProc.killed) return ocrProc;
   ocrProc = spawn(
     "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-NoLogo", "-ExecutionPolicy", "Bypass", "-File", ocrScriptPath()],
+    ["-NoProfile", "-NonInteractive", "-NoLogo", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ocrScriptPath()],
     { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }
   );
   ocrProc.stdout.setEncoding("utf8");
@@ -170,7 +186,7 @@ function ensureOcrProc() {
           try {
             const cleaned = line.split("").filter((c) => c.charCodeAt(0) >= 32).join("");
             cb(JSON.parse(cleaned));
-          } catch (e2) { log("OCR-JSON-PARSE-ERROARE:", e.message, "line=", JSON.stringify(line.slice(0,80))); cb({ ok: false, error: String(e) }); }
+          } catch (e2) { log("OCR-JSON-PARSE-ERROR:", e.message, "line=", JSON.stringify(line.slice(0,80))); cb({ ok: false, error: String(e) }); }
         }
       }
     }
@@ -184,7 +200,7 @@ function ocrRecognize(imagePath) {
     // Daca un request anterior inca asteapta (PowerShell/WinRT blocat), il anulam
     // si recream procesul - altfel noul request scrie intr-un proces blocat si pica.
     if (ocrPending) {
-      log("OCR: proces ocupat, resetez (self-heal)");
+      log("OCR: process busy, resetting (self-heal)");
       try { if (ocrProc) ocrProc.kill(); } catch {}
       ocrProc = null;
       ocrPending = null;
@@ -192,7 +208,7 @@ function ocrRecognize(imagePath) {
     const proc = ensureOcrProc();
     const timer = setTimeout(() => {
       // Proces blocat: il omoram ca urmatorul scan sa porneasca proaspat.
-      log("OCR timeout: omor procesul OCR (self-heal)");
+      log("OCR timeout: killing OCR process (self-heal)");
       try { proc.kill(); } catch {}
       if (ocrProc === proc) ocrProc = null;
       ocrPending = null;
@@ -208,6 +224,157 @@ function ocrRecognize(imagePath) {
       resolve({ ok: false, error: String(e) });
     }
   });
+}
+
+// ---------- helper cald pt overlay-ul de rune: fereastra activa + captura rapida ----------
+// Overlay-ul de rune nu are un ancor OCR ca cel de preturi (regiunea lui e doar un
+// rand din panou), deci se baza doar pe potrivirea iconitelor - care poate da
+// false positives pe desktop/alta aplicatie. Cerem ca fereastra din fata sa fie
+// jocul; altfel overlay-ul nu deseneaza nimic (ramane complet transparent).
+// Captura se face cu GDI (CopyFromScreen) intr-un proces PowerShell cald: ~45ms,
+// fata de ~600ms cat dureaza desktopCapturer-ul folosit de scanarea de preturi.
+const FG_PS1 = `Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class FgWin {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr h, out int pid);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+}
+"@
+[void][FgWin]::SetProcessDPIAware()
+function Read-Fg {
+  try {
+    $h = [FgWin]::GetForegroundWindow()
+    $procId = 0
+    [void][FgWin]::GetWindowThreadProcessId($h, [ref]$procId)
+    $procName = (Get-Process -Id $procId -ErrorAction Stop).ProcessName
+    $sb = New-Object System.Text.StringBuilder 512
+    [void][FgWin]::GetWindowText($h, $sb, 512)
+    return [ordered]@{ ok = $true; process = $procName; title = $sb.ToString() }
+  } catch {
+    return [ordered]@{ ok = $false; error = $_.Exception.Message }
+  }
+}
+while ($null -ne ($line = [Console]::In.ReadLine())) {
+  $line = $line.Trim()
+  if ($line -eq "") { continue }
+  if ($line -eq "fg") {
+    $obj = [ordered]@{ ok = $true; fg = (Read-Fg) }
+  } elseif ($line.StartsWith("tick|")) {
+    $a = $line.Split("|")
+    try {
+      $x = [int]$a[1]; $y = [int]$a[2]; $w = [int]$a[3]; $h = [int]$a[4]; $out = $a[5]
+      $fg = Read-Fg
+      $bmp = New-Object System.Drawing.Bitmap $w, $h
+      $gr = [System.Drawing.Graphics]::FromImage($bmp)
+      $gr.CopyFromScreen($x, $y, 0, 0, (New-Object System.Drawing.Size($w, $h)))
+      $gr.Dispose()
+      $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
+      # luminozitate medie pe o grila rara: prinde capturile negre din fullscreen exclusiv
+      $sum = 0.0; $n = 0
+      for ($yy = 0; $yy -lt $h; $yy += 24) {
+        for ($xx = 0; $xx -lt $w; $xx += 24) { $c = $bmp.GetPixel($xx, $yy); $sum += ($c.R + $c.G + $c.B) / 3.0; $n++ }
+      }
+      $bmp.Dispose()
+      $obj = [ordered]@{ ok = $true; fg = $fg; path = $out; w = $w; h = $h; avg = [math]::Round($sum / [math]::Max(1, $n), 2) }
+    } catch {
+      $obj = [ordered]@{ ok = $false; error = $_.Exception.Message }
+    }
+  } else {
+    continue
+  }
+  Write-Output ($obj | ConvertTo-Json -Compress -Depth 5)
+  [Console]::Out.Flush()
+}
+`;
+let fgProc = null, fgBuf = "", fgPending = null;
+function fgScriptPath() {
+  const ver = require("crypto").createHash("sha1").update(FG_PS1).digest("hex").slice(0, 8);
+  const target = path.join(os.tmpdir(), `xpc-fg-${ver}.ps1`).replace(/\//g, "\\");
+  if (!fs.existsSync(target)) {
+    try { fs.writeFileSync(target, FG_PS1, "utf8"); }
+    catch (e) { log("fgScriptPath: cannot write script:", String(e)); }
+  }
+  return target;
+}
+function ensureFgProc() {
+  if (fgProc && !fgProc.killed) return fgProc;
+  fgProc = spawn(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-NoLogo", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", fgScriptPath()],
+    { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  fgProc.stdout.setEncoding("utf8");
+  fgProc.stdout.on("data", (chunk) => {
+    fgBuf += chunk;
+    let idx;
+    while ((idx = fgBuf.indexOf("\n")) >= 0) {
+      const line = fgBuf.slice(0, idx).replace(/\r$/, "");
+      fgBuf = fgBuf.slice(idx + 1);
+      if (!line) continue;
+      let obj = null;
+      try { obj = JSON.parse(line); } catch {}
+      if (fgPending) { const cb = fgPending; fgPending = null; cb(obj); }
+    }
+  });
+  fgProc.on("exit", () => { fgProc = null; });
+  fgProc.on("error", () => { fgProc = null; });
+  log("fg: foreground helper started");
+  return fgProc;
+}
+function stopFgProc() {
+  fgPending = null;
+  fgBuf = "";
+  try { if (fgProc && !fgProc.killed) fgProc.kill(); } catch {}
+  fgProc = null;
+}
+function fgRequest(line, timeoutMs) {
+  return new Promise((resolve) => {
+    let proc;
+    try { proc = ensureFgProc(); } catch { return resolve(null); }
+    if (!proc) return resolve(null);
+    const timer = setTimeout(() => { if (fgPending) { fgPending = null; resolve(null); } }, timeoutMs || 3000);
+    fgPending = (obj) => { clearTimeout(timer); resolve(obj); };
+    try { proc.stdin.write(line + "\n"); }
+    catch { clearTimeout(timer); fgPending = null; resolve(null); }
+  });
+}
+// jocul = Path of Exile / Path of Exile 2 (standalone sau Steam)
+function isGameWindow(fg) {
+  if (!fg || !fg.ok) return false;
+  return /pathofexile|poe/i.test(fg.process || "") || /path of exile/i.test(fg.title || "");
+}
+// captura rapida (GDI in helper) + foreground intr-un singur round-trip (~60ms);
+// renderer-ul primeste data URL-ul sau isGame:false (si nu deseneaza nimic).
+let runeGrabSeq = 0, runeGrabBlack = 0, runeGrabDisabled = false;
+async function captureRunesFast() {
+  const r = config.runeRegion;
+  if (!r) return { ok: false, error: "Set the rune region first." };
+  const disp = screen.getAllDisplays().find((d) => d.id === r.displayId) || screen.getPrimaryDisplay();
+  const sf = disp.scaleFactor || 1;
+  const px = Math.round(r.x * sf), py = Math.round(r.y * sf);
+  const pw = Math.round(r.width * sf), ph = Math.round(r.height * sf);
+  const file = path.join(os.tmpdir(), "xpc-rune-frame-" + (++runeGrabSeq % 2) + ".png");
+  const res = await fgRequest(`tick|${px}|${py}|${pw}|${ph}|${file}`, 4000);
+  if (!res || !res.ok) return { ok: false, error: (res && res.error) || "capture helper failed" };
+  if (!isGameWindow(res.fg)) return { ok: true, isGame: false };
+  // GDI nu citeste jocurile in fullscreen exclusiv (captura iese neagra) -> fallback
+  if (!runeGrabDisabled && typeof res.avg === "number" && res.avg < 1.5) {
+    if (++runeGrabBlack >= 3) { runeGrabDisabled = true; log("rune-frame: GDI black, using desktopCapturer fallback"); }
+    const legacy = await captureRunesLegacy();
+    return legacy.ok ? { ...legacy, isGame: true } : legacy;
+  }
+  runeGrabBlack = 0;
+  let buf;
+  try { buf = fs.readFileSync(file); } catch (e) { return { ok: false, error: String(e) }; }
+  return {
+    ok: true, isGame: true, width: pw, height: ph, scale: pw / r.width,
+    dataUrl: "data:image/png;base64," + buf.toString("base64"),
+  };
 }
 let lastRows = [];
 let scanning = false;        // guard: nu suprapunem doua scan-uri (poll + buton)
@@ -240,7 +407,7 @@ function checkOcrHealth() {
     try {
       p = spawn(
         "powershell.exe",
-        ["-NoProfile", "-NonInteractive", "-NoLogo", "-ExecutionPolicy", "Bypass", "-Command", OCR_CHECK_PS1],
+        ["-NoProfile", "-NonInteractive", "-NoLogo", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-Command", OCR_CHECK_PS1],
         { windowsHide: true }
       );
     } catch (e) { return resolve({ ok: false, error: String(e) }); }
@@ -261,6 +428,9 @@ function checkOcrHealth() {
 // aratam "Update available". Butonul Update descarca noul exe si il lanseaza.
 const GITHUB_REPO = "iulicafarafrica/PathOfExpedition2";
 const GITHUB_API_LATEST = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+// rulam varianta portable? wrapper-ul electron-builder seteaza aceste variabile;
+// altfel suntem o instalare facuta cu Setup-ul.
+const IS_PORTABLE = !!(process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR);
 
 function parseVer(v) {
   return String(v || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
@@ -325,10 +495,13 @@ async function checkUpdate() {
   }
 }
 
-// Alege asset-ul: preferim exe-ul PORTABLE (fara "Setup" in nume), altfel orice .exe.
+// Alege asset-ul de ACELASI TIP: instalat -> Setup, portable -> exe-ul portable.
+// (altfel o instalare s-ar trezi cu o copie portable in %TEMP% si invers)
 function pickAsset(assets) {
   if (!assets || !assets.length) return null;
-  return assets.find((a) => !/setup/i.test(a.name)) || assets[0];
+  const setup = assets.find((a) => /setup/i.test(a.name));
+  const portable = assets.find((a) => !/setup/i.test(a.name));
+  return IS_PORTABLE ? (portable || setup) : (setup || portable);
 }
 
 async function doUpdate(asset) {
@@ -352,13 +525,22 @@ async function doUpdate(asset) {
     if (h !== asset.sha256) throw new Error("SHA-256 mismatch — download aborted");
     log(`update: sha256 ok (${h})`);
   } else {
-    log("update: release fara sha256 — verificare de integritate sarita");
+    log("update: release without sha256 - integrity check skipped");
   }
   fs.writeFileSync(dest, buf);
   log(`update: downloaded ${asset.name} (${buf.length} bytes) -> ${dest}`);
-  const launchErr = await shell.openPath(dest); // pornește noul exe / installerul
+  if (IS_PORTABLE) {
+    // o singura instanta: daca am lansa acum noua copie, ar fi redirectionata catre
+    // cea veche si ar iesi. Deci pornim noul exe DUPA ce iesim noi (relaunch).
+    app.relaunch({ execPath: dest, args: [] });
+    log("update: restarting into", dest);
+    setTimeout(() => { try { app.quit(); } catch { app.exit(0); } }, 800);
+    return { ok: true, dest, name: asset.name, mode: "portable", restarting: true };
+  }
+  // instalare cu Setup: installer-ul cere singur inchiderea aplicatiei, apoi o reporneste
+  const launchErr = await shell.openPath(dest); // porneste noul exe / installerul
   if (launchErr) throw new Error(launchErr);
-  return dest;
+  return { ok: true, dest, name: asset.name, mode: "installer" };
 }
 
 // ---------- prețuri PoE Ninja ----------
@@ -400,7 +582,7 @@ function loadPricesSnapshot(league) {
     for (const k of Object.keys(map)) (keysByLength[k.length] = keysByLength[k.length] || []).push(k);
     priceCache = { map, keysByLength, fetchedAt: j.fetchedAt || 0 };
     pricesStale = true;
-    log("prețuri din cache local (offline):", Object.keys(map).length, "itemuri");
+    log("prices from local cache (offline):", Object.keys(map).length, "items");
     return true;
   } catch { return false; }
 }
@@ -488,10 +670,10 @@ async function fetchPrices(league) {
         const icon = it.image ? "https://web.poecdn.com" + it.image : null;
         out.push({ id: line.id, name: it.name, price: divine, category: it.category, trend: sparkTrend(line.sparkline), trendPct: sparkPct(line.sparkline), trendData: sparkData(line.sparkline), icon });
       }
-      if (out.length) log("fetchPrices:", type, "->", out.length, "itemuri (primary=" + primary + ")");
+      if (out.length) log("fetchPrices:", type, "->", out.length, "items (primary=" + primary + ")");
       return out;
     } catch (e) {
-      log("fetchPrices:", type, "ERROARE", e.message);
+      log("fetchPrices:", type, "ERROR", e.message);
       return [];
     }
   });
@@ -515,7 +697,7 @@ async function fetchPrices(league) {
   pricesStale = false;
   priceCache = { map, keysByLength, fetchedAt: Date.now() };
   savePricesSnapshot();
-  log("fetchPrices: GATA total", Object.keys(map).length, "itemuri");
+  log("fetchPrices: DONE total", Object.keys(map).length, "items");
   return map;
 }
 // --- matching fuzzy (OCR garble: "Chaos"->"Chao", "Jeweller's"->"Jeweller s") ---
@@ -660,27 +842,27 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 function loadConfig() {
-  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false, font: "georgia" };
+  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false, font: "segoe" };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
-    log("loadConfig: citit", raw.length, "chari");
+    log("loadConfig: read", raw.length, "chars");
     const cfg = Object.assign({}, defaults, JSON.parse(raw));
     log("loadConfig: OK");
     return cfg;
   } catch (e) {
-    log("loadConfig: ERROARE", e.message);
+    log("loadConfig: ERROR", e.message);
     return defaults;
   }
 }
 function saveConfig() {
   try {
     const s = JSON.stringify(config, null, 2);
-    log("saveConfig: stringify OK", s.length, "chari");
+    log("saveConfig: stringify OK", s.length, "chars");
     fs.mkdirSync(path.dirname(configPath()), { recursive: true });
     fs.writeFileSync(configPath(), s);
     log("saveConfig: scris OK");
   } catch (e) {
-    log("saveConfig: ERROARE", e.message);
+    log("saveConfig: ERROR", e.message);
   }
 }
 
@@ -696,6 +878,7 @@ function createWindow() {
     minHeight: 480,
     title: "Path of Expedition",
     backgroundColor: "#111827",
+    show: false,   // apare doar dupa primul render (fara flash alb la pornire)
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -703,6 +886,9 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
+  win.once("ready-to-show", () => win.show());
+  win.on("unresponsive", () => log("WINDOW UNRESPONSIVE (main window)"));
+  win.on("responsive", () => log("window responsive again"));
   win.setMenuBarVisibility(false);   // fara meniul File/Edit/View (neprofesional)
   win.on("close", () => {
     const r = win.getBounds();
@@ -759,11 +945,14 @@ async function captureRegion(region) {
   }
   return { width: pw, height: ph, data: out };
 }
-// ---------- OCR (Windows OCR nativ) + parsing ----------
+// Ancor de panou: titlul "Runeshape Combinations" (OCR il da ca "Runeshape Combinati0M").
+// E specific panoului de runeshaping si NU apare in market/altceva -> il folosim ca gate:
+// daca lipseste din OCR, nu suntem pe panou si nu arat nimic (evita false positives din market).
+const PANEL_ANCHOR = /runeshape|ruweshape|runeshupe|combin/i;
 async function doScan(force) {
-  if (selectOpen) { log("doScan: selectOpen, sarit"); return { rows: [], error: null };
+  if (selectOpen) { log("doScan: selectOpen, skipped"); return { rows: [], error: null };
   }
-  if (!config.region) { log("doScan: fara regiune"); return { rows: [], error: "Choose a region first (Select region)." };
+  if (!config.region) { log("doScan: no region"); return { rows: [], error: "Choose a region first (Select region)." };
   }
   try {
     let shot = await captureRegion(config.region);
@@ -784,12 +973,21 @@ async function doScan(force) {
     fs.writeFileSync(tmp, img.toPNG());
     const result = await ocrRecognize(tmp);
     try { fs.unlinkSync(tmp); } catch {}
-    log("doScan: OCR rezultat ok=", result.ok, "lines=", (result.lines||[]).length);
+    log("doScan: OCR result ok=", result.ok, "lines=", (result.lines||[]).length);
     if (!result.ok) { log("doScan: OCR error", result.error); return { rows: [], error: result.error || "OCR error" }; }
     const lines = (result.lines || [])
       .map((l) => ({ text: (l.text || "").trim(), y: l.y || 0 }))
       .filter((l) => l.text.length > 0);
     lastOcrLines = lines.map((l) => l.text);   // pt fereastra Debug
+    // GATE de panou: fara ancorul "Runeshape Combinations" nu suntem pe panou
+    // (ex. suntem in market) -> golim, ca sa nu arat itemi din alte ecrane.
+    if (!lines.some((l) => PANEL_ANCHOR.test(l.text))) {
+      log("doScan: panel anchor MISSING (not on Runeshaping) -> clearing");
+      lastRows = [];
+      lastScanHash = pHash;
+      lastScanPricesAt = priceCache.fetchedAt;
+      return { rows: [], at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale, panelMissing: true };
+    }
     const rows = parseLines(lines);
     // FILTRU CHAT: pastram doar randuri cu cantitate explicita (Nx) SAU item cunoscut in API.
     // Chat-ul din joc (peste panou) nu are nici "Nx", nici nu e un item -> e respins.
@@ -827,7 +1025,7 @@ async function doScan(force) {
     lastRows = rows;
     lastScanHash = pHash;
     lastScanPricesAt = priceCache.fetchedAt;
-    log("doScan: rows=", rows.length, "(filtrate", filtered + ")", JSON.stringify(rows.map((r) => r.qty + "x" + r.name)));
+    log("doScan: rows=", rows.length, "(filtered", filtered + ")", JSON.stringify(rows.map((r) => r.qty + "x" + r.name)));
     // ALERTA SONORA: item nou (fata de scanul anterior) cu valoare >= 1 Divine.
     // Comparăm setul de nume scumpe ca sa sunăm o singura data per item nou.
     const highNow = new Set();
@@ -841,7 +1039,7 @@ async function doScan(force) {
     }
     lastAlertSet = highNow;
     if (config.soundAlert && newHigh > 0) {
-      log("alert: iteme noi >= " + ALERT_MIN_DIVINE + " div:", newHigh);
+      log("alert: new items >= " + ALERT_MIN_DIVINE + " div:", newHigh);
       if (win && !win.isDestroyed()) win.webContents.send("alert", { count: newHigh });
     }
     return { rows, at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale };
@@ -864,10 +1062,14 @@ async function runScan(force) {
     scanning = false;
   }
 }
+// frecventa de scan in functie de overlay: ON -> rapid (3s, e pe panou);
+// OFF -> lent (30s, doar fundal) ca sa NU punem presiune pe GPU/capture in timpul jocului.
+function pollMs() { return config.overlay ? 3000 : 30000; }
 function startPoll() {
   stopPoll();
-  log("startPoll: pornit");
-  pollTimer = setInterval(() => { runScan(false); }, 3000);
+  const ms = pollMs();
+  log("startPoll: interval", ms/1000 + "s (overlay " + (config.overlay ? "ON" : "OFF") + ")");
+  pollTimer = setInterval(() => { runScan(false); }, ms);
 }
 function stopPoll() {
   if (pollTimer) clearInterval(pollTimer);
@@ -941,6 +1143,7 @@ function toggleOverlay(on) {
     if (overlayWin && !overlayWin.isDestroyed()) overlayWin.close();
     overlayWin = null;
     lastOverlaySig = "";   // urmatoarea pornire va re-trimite frame-ul complet
+    if (config.region) startPoll();   // coboram la frecventa lenta de fundal (30s)
     return { ok: true, on: false };
   }
   if (!config.region) return { ok: false, on: false, error: "Set a region first (Select region)." };
@@ -971,6 +1174,7 @@ function toggleOverlay(on) {
   overlayWin.on("closed", () => { overlayWin = null; lastOverlaySig = ""; });  // config.overlay ramane cum e salvat
   config.overlay = true;
   saveConfig();
+  if (config.region) { startPoll(); runScan(false); }   // frecventa rapida (3s) + scan imediat
   return { ok: true, on: true };
 }
 
@@ -990,6 +1194,7 @@ function toggleRuneOverlay(on) {
     saveConfig();
     if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.close();
     runeOverlayWin = null;
+    stopFgProc();   // nu mai tinem procesul de detecție a ferestrei active
     return { ok: true, on: false };
   }
   if (!config.runeRegion) return { ok: false, on: false, error: "Set the rune region first." };
@@ -1062,7 +1267,7 @@ ipcMain.handle("plan-recipes", (_e, runes) => {
 ipcMain.handle("check-ocr", () => checkOcrHealth());
 // citirea runelor din panou: capturam regiunea runeRegion si trimitem PNG in renderer,
 // unde se face template-matching-ul (Chromium decodeaza webp/png nativ, mult mai rapid).
-ipcMain.handle("capture-runes", async () => {
+async function captureRunesLegacy() {
   try {
     if (!config.runeRegion) return { ok: false, error: "Set the rune region first." };
     const shot = await captureRegion(config.runeRegion);
@@ -1070,7 +1275,10 @@ ipcMain.handle("capture-runes", async () => {
     const img = nativeImage.createFromBitmap(Buffer.from(shot.data), { width: shot.width, height: shot.height });
     return { ok: true, dataUrl: "data:image/png;base64," + img.toPNG().toString("base64"), width: shot.width, height: shot.height, scale: k };
   } catch (e) { log("capture-runes:", e.message); return { ok: false, error: String(e) }; }
-});
+}
+ipcMain.handle("capture-runes", () => captureRunesLegacy());
+// cadru rapid pt overlay-ul de rune (foreground + captura GDI); vezi captureRunesFast
+ipcMain.handle("rune-frame", () => captureRunesFast());
 // update: verificare ultimul release GitHub + descarcare/lanare
 ipcMain.handle("check-update", () => checkUpdate());
 ipcMain.handle("do-update", async () => {
@@ -1083,8 +1291,8 @@ ipcMain.handle("do-update", async () => {
     if (!info.updateAvailable) throw new Error("No update available");
     const asset = pickAsset(info.assets);
     if (!asset) throw new Error("No downloadable asset in the release");
-    const dest = await doUpdate(asset);
-    return { ok: true, dest, name: asset.name };
+    const res = await doUpdate(asset);
+    return res;
   } catch (e) {
     log("update failed: " + e);
     return { ok: false, error: String(e) };
@@ -1215,7 +1423,7 @@ function pushFontToOverlays() {
 ipcMain.handle("set-font", (_e, f) => {
   const id = String(f || "");
   const known = ["georgia", "segoe", "cambria", "consolas", "verdana", "tahoma", "trebuchet", "times", "courier", "arial", "norse"];
-  config.font = known.includes(id) ? id : "georgia";
+  config.font = known.includes(id) ? id : "segoe";
   saveConfig();
   pushFontToOverlays();
   return { ok: true, font: config.font };
@@ -1245,7 +1453,7 @@ function selectRegionFlow(kind) {
       const ovl = overlayWin && !overlayWin.isDestroyed() ? overlayWin : null;
       const r = region || {};
       if (![r.x, r.y, r.width, r.height].every((n) => Number.isFinite(n)) || r.width < 40 || r.height < 30) {
-        log("region rejected: geometrie invalida");
+        log("region rejected: invalid geometry");
         try { sel.close(); } catch {}
         if (ovl && kind === "scan") ovl.showInactive();
         if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.showInactive();
@@ -1289,15 +1497,16 @@ app.on("web-contents-created", (_e, contents) => {
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
 });
 
-app.whenReady().then(() => {
+if (isSingleInstance) app.whenReady().then(() => {
+  // overlay-urile NU pornesc automat la lansare: la fiecare start incep OPRITE
+  // (si salvam starea), ca sa nu apara peste joc fara sa fie cerute explicit.
+  config.overlay = false;
+  config.runeOverlay = false;
+  saveConfig();
   createWindow();
   // pornim scanarea + overlay-urile IMEDIAT (fara sa asteptam preturile), ca
   // aplicatia sa se simta deschisa din prima; preturile se incarca in background
   if (config.region) startPoll();
-  // repune overlay-ul daca era pornit la ultima rulare
-  if (config.overlay) toggleOverlay(true);
-  // si overlay-ul de rune (ca peste buton sa fie mereu ON/OFF corect cu fereastra)
-  if (config.runeOverlay && config.runeRegion) toggleRuneOverlay(true);
   // preturile: in background (cu timeout), NU blocheaza deschiderea ferestrelor.
   // primul scan (la 3s) le prinde deja incarcate; pana atunci itemele arata "unknown".
   fetchPrices(config.league || "Forbidden Rites").catch(() => {});
@@ -1305,22 +1514,35 @@ app.whenReady().then(() => {
   setInterval(async () => {
     try {
       await fetchPrices(config.league || "Forbidden Rites");
-      log("auto-refresh: preturi actualizate", Object.keys(priceCache.map).length);
-    } catch (e) { log("auto-refresh: eroare", e.message || e); }
+      log("auto-refresh: prices updated", Object.keys(priceCache.map).length);
+    } catch (e) { log("auto-refresh: error", e.message || e); }
   }, 30 * 60 * 1000);
   // daca ramanem pe prețuri "stale" (offline), reîncercam la 5 min
   setInterval(async () => {
     if (!pricesStale) return;
     try { await fetchPrices(config.league || "Forbidden Rites"); }
-    catch (e) { log("retry prețuri:", e.message || e); }
+    catch (e) { log("retry prices:", e.message || e); }
   }, 5 * 60 * 1000);
+});
+// la inchidere: opresc polling-ul si OMOR procesul PowerShell OCR (cald) ca sa nu ramana orfan
+app.on("will-quit", () => {
+  try { stopPoll(); } catch {}
+  try { if (ocrProc && !ocrProc.killed) ocrProc.kill(); } catch {}
+  try { stopFgProc(); } catch {}
 });
 app.on("window-all-closed", () => app.quit());
 
 // prinde erorile nemanagite ca sa vedem exact unde e bug-ul
 process.on("uncaughtException", (e) => {
-  console.error("[UNCAUGHT]", e && e.stack ? e.stack : e);
+  log("UNCAUGHT EXCEPTION:", e && e.stack ? e.stack : String(e));
 });
 process.on("unhandledRejection", (e) => {
-  console.error("[UNHANDLED]", e && e.stack ? e.stack : e);
+  log("UNHANDLED REJECTION:", e && e.stack ? e.stack : String(e));
+});
+// crash-uri de sub-proces (renderer/GPU/utility) -> in log, ca sa vedem freeze-uri/crash-uri
+app.on("child-process-gone", (_e, d) => {
+  log("CHILD PROCESS GONE:", (d && d.type) || "?", "reason=" + ((d && d.reason) || "?"), "exitCode=" + ((d && d.exitCode) ?? "?"));
+});
+app.on("render-process-gone", (_e, _wc, d) => {
+  log("RENDER PROCESS GONE:", (d && d.reason) || "?", "exitCode=" + ((d && d.exitCode) ?? "?"));
 });

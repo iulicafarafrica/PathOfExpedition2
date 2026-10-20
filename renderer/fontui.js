@@ -3,8 +3,8 @@
 // aici mapam token -> CSS font-stack si il punem pe variabila --ui-font.
 (function () {
   const TOKENS = [
-    { id: "georgia",   label: "Georgia",          stack: 'Georgia, "Times New Roman", serif' },
     { id: "segoe",     label: "Segoe UI",         stack: "'Segoe UI', Tahoma, sans-serif" },
+    { id: "georgia",   label: "Georgia",          stack: 'Georgia, "Times New Roman", serif' },
     { id: "cambria",   label: "Cambria",          stack: 'Cambria, "Times New Roman", serif' },
     { id: "consolas",  label: "Consolas",         stack: "'Consolas', 'Courier New', monospace" },
     { id: "verdana",   label: "Verdana",          stack: 'Verdana, Geneva, sans-serif' },
@@ -15,7 +15,7 @@
     { id: "arial",     label: "Arial",            stack: 'Arial, Helvetica, sans-serif' },
     { id: "norse",     label: "Norse (fantasy)",  stack: '"Norse", Georgia, serif' },
   ];
-  const DEFAULT = "georgia";
+  const DEFAULT = "segoe";
   function byId(id) { return TOKENS.find((t) => t.id === id) || TOKENS[0]; }
   // aplica fontul pe intreaga fereastra (variabila CSS citita de toate regulile)
   function apply(id) {

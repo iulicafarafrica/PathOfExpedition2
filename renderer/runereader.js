@@ -108,11 +108,50 @@
   // rune cu NCC >= ~0.70; pamantul/obiectele raman sub acesti praguri, asa ca
   // filtrul astea impiedica false-positives (cand panoul e inchis si in box
   // se vede pamantul/harta).
-  const CONF = 0.6, CONF2 = 0.5;
-  function rowOk(det) {
-    if (!det || det.length < 2) return false;
+  // praguri ridicate: pe orice altceva decat panoul real (desktop, iconite, UI de joc)
+  // potrivirile urca rar peste ~0.62, in timp ce randurile reale au cel putin o runa
+  // peste ~0.70; asa overlay-ul nu mai deseneaza randuri "random" cand panoul e inchis
+  const CONF = 0.68, CONF2 = 0.55;
+  function median(a) {
+    const s = a.slice().sort((x, y) => x - y);
+    const n = s.length;
+    return n ? (n % 2 ? s[(n - 1) >> 1] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0;
+  }
+  // Un rand din panoul real e o linie de iconite IDENTICE ca marime, aliniate pe
+  // acelasi y si distanțate egal. Texturile/iconitele de pe desktop trec uneori de
+  // pragurile NCC, dar nu au aceasta geometrie -> filtrul le elimina.
+  function rowGeometryOk(cells, cy) {
+    if (!cells || cells.length < 2) return false;
+    const medW = median(cells.map((c) => c.w));
+    const medH = median(cells.map((c) => c.h));
+    if (!medW || !medH) return false;
+    for (const c of cells) {
+      // latimea glifelor variaza mult intre rune (0.53-0.84 din sprite), inaltimea
+      // aproape deloc (0.61-0.78) -> verificam inaltimea strict si latimea larg
+      if (c.w < medW * 0.55 || c.w > medW * 1.75) return false;
+      if (c.h < medH * 0.7 || c.h > medH * 1.4) return false;
+      if (Math.abs(c.miny + c.h / 2 - cy) > medH * 0.4) return false;
+    }
+    if (cells.length >= 3) {
+      const gaps = [];
+      for (let i = 1; i < cells.length; i++) gaps.push(cells[i].minx - (cells[i - 1].minx + cells[i - 1].w));
+      const medGap = median(gaps);
+      if (medGap < 0) return false;
+      for (const gp of gaps) {
+        if (gp < -1) return false;
+        if (gp > Math.max(10, medGap * 2.5)) return false;
+      }
+    }
+    return true;
+  }
+  function rowOk(det, cells, cy) {
+    if (!det || det.length < 2 || !cells) return false;
     const s = det.map((d) => d.sc);
-    return Math.max.apply(null, s) >= CONF && s.filter((x) => x >= CONF2).length >= 2;
+    if (Math.max.apply(null, s) < CONF) return false;
+    if (s.filter((x) => x >= CONF2).length < 2) return false;
+    // fiecare celula a randului trebuie recunoscuta ca runa (fara "gauri")
+    if (det.length < cells.length) return false;
+    return rowGeometryOk(cells, cy);
   }
 
   async function detectRows(dataUrl, k) {
@@ -155,7 +194,7 @@
       r.cells.sort((a, b) => a.minx - b.minx);
       const det = [];
       for (const cc of r.cells) { const m = classifyCell(g, W, H, cc); if (m) det.push(m); }
-      out.push({ cy: r.cy, n: r.cells.length, det, ok: rowOk(det) });
+      out.push({ cy: r.cy, n: r.cells.length, det, ok: rowOk(det, r.cells, r.cy) });
     }
     return out;
   }
