@@ -23,6 +23,8 @@ Price your Expedition drops while you run. Plan your Runeshape combos. Never alt
 
 A small Windows app that **reads the Expedition reward panel from your screen** and tells you what those drops are worth, using live prices from poe.ninja. It shows them right over the game in a click-through overlay, or in a compact window.
 
+Works with **non-English game clients** and is translated into **10 UI languages**. The app detects the language your game runs in and opens in it automatically.
+
 It also ships with the full Runeshape rune database (**33 runes, 322 combinations**): a **Rune Planner** that does the combo math for you, and a second overlay that reads your runes and tells you what to keep and what to chase.
 
 | Local & private | Zero input lag | Free & open source |
@@ -52,9 +54,10 @@ It also ships with the full Runeshape rune database (**33 runes, 322 combination
  | `Path of Expedition Setup <version>.exe` | **Installer.** Start-menu entry, normal uninstall. |
 
 2. **Launch it** and pick your **league** from the dropdown.
-3. In-game, open the **Runeshape Combinations** panel.
-4. Click **Select region**, drag the green box over the reward list, press **Enter**.
-5. Done. It scans every 3 seconds and shows the running total as items land. Hit **Overlay** to draw prices over the game.
+3. The app already knows your game's language (**Language → Auto**) and opens in it. Change it under **⚙ → Language** if you prefer a different UI language.
+4. In-game, open the **Runeshape Combinations** panel.
+5. Click **Select region**, drag the green box over the reward list, press **Enter**.
+6. Done. It scans every 3 seconds and shows the running total as items land. Hit **Overlay** to draw prices over the game.
 
 Your region and league are saved. If you move the game window, re-select the region.
 
@@ -64,6 +67,8 @@ Your region and league are saved. If you move the game window, re-select the reg
 ---
 
 ## Features
+
+**Available in 10 languages** (English, Dutch, German, French, Spanish, Portuguese BR, Russian, Japanese, Korean, Thai) and **works with non-English game clients** - the app detects the language your game runs in and prices localized item names automatically. See [Languages](#languages).
 
 ### Pricing
 
@@ -88,11 +93,25 @@ Your region and league are saved. If you move the game window, re-select the reg
 | **Screenshots & recording** | The overlay is capturable: Snipping Tool, Print Screen, OBS. |
 | **League switch** | Change league in-app and the current panel is re-priced instantly. |
 
+### Languages
+
+| | |
+| --- | --- |
+| **10 UI languages** | English, Dutch, German, French, Spanish, Portuguese (BR), Russian, Japanese, Korean and Thai. Switch live from **⚙ → Language**. |
+| **Auto (game language)** | Reads `poe2_production_Config.ini` and opens in the language your game client runs in. Pick a language manually to pin it; **Auto** follows the game again. |
+| **Any game client** | Item names are read in the game language and matched to poe.ninja's English names through the official trade database (same IDs in every language), so pricing works in **DE / FR / ES / PT / RU / JA / KO / TH**. |
+| **Names follow the app** | Item names in the window and the overlay are displayed in the app language and switch instantly - even with the overlay off. |
+| **Language-aware OCR** | The OCR engine follows the game language. If that Windows language pack is missing, it falls back to English and shows a warning instead of silently reading nothing. |
+
+> [!NOTE]
+> Russian, Japanese, Korean and Thai need their own **Windows OCR language pack** (see [How the OCR works](#how-the-ocr-works)). German, French, Spanish and Portuguese work well with the English pack too, but their own pack gives the best accuracy.
+
 ### Smart reading
 
 | | |
 | --- | --- |
 | **Windows OCR** | Uses the OCR built into Windows. No cloud, no model downloads. See [How the OCR works](#how-the-ocr-works). |
+| **Language-aware matching** | Localized panel titles are recognised, and OCR quirks (lost diacritics, plurals like `Gemme` → `Gemmen`, `(Stufe 19)` suffixes) are matched to the correct item. |
 | **Smart name matching** | Layered: exact → digit fixes (`0→o`, `1→l`) → prefix → fuzzy. Fixes possessives ("Jeweller s" → "Jewellers") and won't guess levels on uncut gems. |
 | **Noise filter** | Chat lines and panel noise without an `Nx` quantity get dropped. |
 | **Multi-monitor & DPI** | Binds capture to the right display. 125% / 150% scaling is fine. |
@@ -183,6 +202,8 @@ Like the price overlay, it needs **borderless windowed** mode and free space to 
 | Problem | Fix |
 | --- | --- |
 | **Garbled text / nothing matches** | Wrong or missing OCR language, see [below](#how-the-ocr-works). The **Debug window** shows exactly what OCR read. |
+| **Overlay empty with a non-English game** | Keep **Game language** on **Auto** (read from the game) or set it manually. For RU/JA/KO/TH, install that Windows OCR pack. |
+| **Item names show in English** | Set **Language** to **Auto (game language)** or to your language - names in the window and overlay follow the app language. |
 | **Some drops missing** | Make the region cover the whole list, keep chat and other windows off the panel, and keep in-game UI scale normal. |
 | **Overlay doesn't show** | Use **borderless windowed** (exclusive fullscreen hides overlays) and leave free space right of the region. |
 | **Wrong price** | poe.ninja has no data for that item, or it's a level-specific uncut gem (deliberately not guessed). Prices are always current exchange value. |
@@ -204,16 +225,16 @@ No Tesseract, no Python, no downloaded model. The app uses **Windows' own OCR en
 Per scan:
 
 1. **Capture**: Electron's `desktopCapturer` grabs the screen at native resolution, crops your region (DPI-corrected) and writes a temp PNG.
-2. **Recognize**: a bundled PowerShell script (`ocr.ps1`) loads the PNG and runs `OcrEngine.RecognizeAsync`. It tries **English** first, then falls back to your Windows profile languages. It returns each line's text and position as JSON.
+2. **Recognize**: a bundled PowerShell script (`ocr.ps1`) loads the PNG and runs `OcrEngine.RecognizeAsync` with the **game's language** (detected from the PoE2 client config, or picked in **Game language**). If that engine isn't installed it falls back to **English**, then your Windows profile languages. It returns each line's text and position as JSON.
 3. **Parse**: the main process groups lines into reward rows (name + `Nx`), filters noise and matches against the price cache.
 
 Everything runs locally. No screenshot or text ever leaves your machine.
 
-**Requirement:** an OCR language pack must be installed in Windows:
+**Requirement:** an OCR language pack must be installed in Windows. The app picks the pack matching your game language; if it's missing (Russian, Japanese, Korean and Thai always need it) it falls back to English, which is less accurate:
 
 > Settings → Time & Language → Language & region → (your language) → Language options → **Download** under "Optional features" (OCR)
 
-If items don't match, hit **Check OCR** in the app. It reports whether the engine loads and which languages are available.
+If items don't match, hit **Check OCR** in the app. It reports whether the engine loads, which languages are available, and if the pack for your game language is missing.
 
 </details>
 
@@ -233,7 +254,7 @@ The whole app is in this repo, [MIT licensed](LICENSE), with no hidden part. The
 | Release `.exe` URL | **Only** when you press "Update now" |
 | `buymeacoffee.com` | **Only** when you click the footer link |
 
-No telemetry, no analytics, no other endpoints. Settings live in one `config.json` under `%APPDATA%\path-of-expedition`.
+No telemetry, no analytics, no other endpoints. Settings live in one `config.json` under `%APPDATA%\path-of-expedition`. Locally it also reads `poe2_production_Config.ini` from your PoE2 documents folder, only to detect the game language.
 
 **Build it yourself** (Windows, Node 18+):
 
@@ -281,7 +302,8 @@ Code signing for releases is in progress and will remove most of these flags.
 - **Vanilla HTML/CSS/JS** UI: three screens (main window, price overlay, rune overlay), no framework
 - **Rune detection**: pure image template matching (33 bundled rune sprites), no OCR
 - **Bundled database**: `data/runes.json` (33 runes) + `data/recipes.json` (322 combinations, patch 0.5.5), loaded once, fully offline
-- **WinRT OCR via PowerShell**: `Windows.Media.Ocr`, `Windows.Graphics.Imaging`
+- **Localized names**: `data/names/<lang>.json` (official trade names, localized → English) and `data/names/rev-<lang>.json` (English → localized, for display), generated from the official trade static data; the game language is read from `poe2_production_Config.ini`, so no manual setup
+- **WinRT OCR via PowerShell**: `Windows.Media.Ocr`, `Windows.Graphics.Imaging`, one warm process that restarts with the matching engine when the language changes
 - **Web Audio API** for the alert chime, generated in code
 - **poe.ninja** exchange API (`/poe2/api/economy/exchange/current/overview`) and image CDN
 - **GitHub Releases API** for updates (SHA-256 verified)
