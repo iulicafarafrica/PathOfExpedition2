@@ -11,7 +11,7 @@ Price your Expedition drops while you run. Plan your Runeshape combos. Never alt
 [![License](https://img.shields.io/badge/License-MIT-2ea043?style=for-the-badge)](LICENSE)
 [![Prices](https://img.shields.io/badge/Prices-poe.ninja-8b5cf6?style=for-the-badge)](https://poe.ninja)
 
-![In-game overlay](screenshot-overlay.jpeg)
+![In-game overlay](tycUOSf.jpeg)
 
 *Live poe.ninja prices drawn straight over your Runeshape panel.*
 
