@@ -33,7 +33,7 @@ It also ships with the full Runeshape rune database (**33 runes, 322 combination
 
 <div align="center">
 
-![The app window](ZAzLEPP.png)
+![The app window](CKQshjl.png)
 
 *Prefer a normal window? Same price list, with icons, value tiers and a running total.*
 
