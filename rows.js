@@ -37,14 +37,19 @@ function stripLeadingNoise(norm) {
   return s;
 }
 
+// Titlul panoului de runeshaping, in toate limbile jocului. OCR-ul il citeste
+// aproximativ ("Ruweshape", "Runenform-Kombinationen"), deci cautam radacini.
+// Folosit si ca GATE de panou in main.js: fara titlu nu suntem pe panou.
+const PANEL_ANCHOR = /runeshape|ruweshape|runeshupe|runenform|kombination|kombinaci|combin|комбинац|組み合わせ|조합|ผสม/i;
+
 // Gate: un rand valid trebuie sa aiba minim 4 chari si un cuvant de minim 4 chari.
 function nameGateReject(name) {
   if (name.length < 4) return "short";
   const words = name.split(" ");
   const hasWord4 = words.some((w) => w.length >= 4);
   if (!hasWord4) return "noword";
-  // respinge titlul panoului ("Runeshape Combinations" si variantele misread de OCR)
-  if (/runeshape|runes hape|combination|combinat/.test(name)) return "title";
+  // respinge titlul panoului ("Runeshape Combinations" si traducerile lui)
+  if (PANEL_ANCHOR.test(name)) return "title";
   return null;
 }
 
@@ -64,20 +69,34 @@ function parseRow(rawLine) {
   return { qty: mult.qty, name: nameNorm, raw: rawLine.trim(), explicit: mult.explicit };
 }
 
+// Gate de panou: titlul panoului (in orice limba) SAU minim 2 randuri cu cantitate
+// explicita ("3x ..."). Al doilea criteriu acopera cazul in care titlul e ilizibil
+// (lipseste pachetul OCR al limbii jocului), dar randurile de item se pot citi.
+function panelDetected(lines) {
+  const arr = (lines || [])
+    .map((l) => (typeof l === "string" ? { text: l, y: 0 } : l))
+    .filter((l) => l.text && l.text.trim());
+  if (arr.some((l) => PANEL_ANCHOR.test(l.text))) return true;
+  let explicit = 0;
+  for (const l of arr) {
+    const r = parseRow(l.text);
+    if (r && r.explicit) explicit++;
+  }
+  return explicit >= 2;
+}
+
 function parseLines(lines) {
   // accepta strings sau obiecte {text, y}
   const withY = lines
     .map((l) => (typeof l === "string" ? { text: l, y: 0 } : l))
     .filter((l) => l.text && l.text.trim());
-  const topY = withY.length ? Math.min(...withY.map((l) => l.y || 0)) : 0;
-  const TITLE_BAND = 45; // px - banda titlului in partea de sus
 
   const out = [];
   for (const l of withY) {
     const r = parseRow(l.text);
     if (!r) continue;
-    // respinge titlul: prima linie (peste banda) fara multiplicator explicit
-    if (!r.explicit && Math.abs((l.y || 0) - topY) < TITLE_BAND) continue;
+    // NU taiem dupa Y: titlul e deja respins de PANEL_ANCHOR, iar cand titlul nu e
+    // citit deloc (pachet OCR lipsa) primul rand de item e chiar in banda de sus.
     out.push({ ...r, y: l.y || 0 });
   }
   return out;
@@ -99,4 +118,4 @@ if (require.main === module) {
   console.log("Total randuri:", rows.length);
 }
 
-module.exports = { parseLines, parseRow, normalizeName, extractMultiplier };
+module.exports = { parseLines, parseRow, normalizeName, extractMultiplier, panelDetected, PANEL_ANCHOR };

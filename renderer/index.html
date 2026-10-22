@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: file: https://web.poecdn.com"
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: file: https://web.poecdn.com"
 />
 <title>Path of Expedition</title>
 <style>
@@ -214,6 +214,49 @@
   }
   .cb-list { flex:1; min-height:0; max-height:none; }
   .ctag { flex-shrink:0; font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.4px; color:#fff; background:#6b5a33; border-radius:7px; padding:0 5px; }
+  /* ---------- Guide ---------- */
+  .guide {
+    flex:1; min-height:0; overflow-y:auto;
+    background:linear-gradient(#e0d1ad,#d3c19a);
+    border:2px solid var(--line); border-radius:4px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.25);
+    padding:10px 13px; font-size:12px; line-height:1.5; color:var(--ink);
+  }
+  .guide h2 { font-size:14px; margin:0 0 2px; }
+  .guide .gsub { font-size:11px; font-style:italic; color:var(--ink-soft); margin:0 0 8px; }
+  .guide h3 {
+    font-size:11px; margin:12px 0 4px; color:var(--gold);
+    text-transform:uppercase; letter-spacing:.6px;
+    border-bottom:1px solid rgba(138,111,71,.35); padding-bottom:2px;
+  }
+  .guide h3:first-of-type { margin-top:6px; }
+  .guide p { margin:0 0 5px; }
+  .guide ul { margin:0 0 3px; padding-left:18px; }
+  .guide li { margin:2px 0; }
+  .guide .glbl { font-size:10px; font-weight:bold; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px; margin:9px 0 2px; }
+  .guide table.gt { width:100%; border-collapse:collapse; font-size:11px; margin:0 0 3px; }
+  .guide .gt th {
+    text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.4px;
+    color:var(--ink-soft); border-bottom:1px solid rgba(138,111,71,.5); padding:2px 4px;
+  }
+  .guide .gt td { border-bottom:1px solid rgba(138,111,71,.25); padding:3px 4px; }
+  .guide .gt tr:last-child td { border-bottom:0; }
+  .guide .gt .tr { font-weight:bold; text-align:center; white-space:nowrap; }
+  .guide .gt .tr.S { color:#9a6b00; }
+  .guide .gt .tr.A { color:var(--green); }
+  .guide .gt .tr.B { color:#4a5d8a; }
+  .guide .gt .tr.C { color:var(--ink-soft); }
+  .guide .gt .tr.D { color:#8a2a2a; }
+  .guide .gsrc { font-size:10.5px; color:var(--ink-soft); margin:4px 0 0; }
+  .guide .gsrc a { color:var(--gold); font-weight:bold; cursor:pointer; text-decoration:none; }
+  .guide .gsrc a:hover { text-decoration:underline; }
+  .guide .credit {
+    margin-top:12px; padding-top:7px; border-top:1px solid rgba(138,111,71,.35);
+    font-size:10.5px; color:var(--ink-soft);
+  }
+  .guide .credit a { color:var(--gold); font-weight:bold; cursor:pointer; text-decoration:none; }
+  .guide .credit a:hover { text-decoration:underline; }
+  .guide .src { display:inline-block; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -221,33 +264,36 @@
   <header class="appbar">
     <h1>Path of Expedition</h1>
     <nav class="tabs">
-      <div class="tab active" id="tabBtnPrices">Prices</div>
-      <div class="tab" id="tabBtnPlanner">Rune Planner</div>
-      <div class="tab" id="tabBtnCombos">All Combos</div>
+      <div class="tab active" id="tabBtnPrices" data-i18n="tab.prices">Prices</div>
+      <div class="tab" id="tabBtnPlanner" data-i18n="tab.planner">Rune Planner</div>
+      <div class="tab" id="tabBtnCombos" data-i18n="tab.combos">All Combos</div>
+      <div class="tab" id="tabBtnGuide" data-i18n="tab.guide">Guide</div>
     </nav>
     <span class="opt-wrap">
-      <button id="optBtn" class="gear" title="Options: font, refresh prices, check OCR, update, debug">⚙</button>
+      <button id="optBtn" class="gear" data-i18n-title="opt.toggle" title="Options: font, refresh prices, check OCR, update, debug">⚙</button>
       <div id="optMenu" class="opt-menu" hidden>
-        <label class="opt-row">Font <select id="fontSel"></select></label>
+        <label class="opt-row"><span data-i18n="opt.language">Language</span> <select id="langSel"></select></label>
+        <label class="opt-row" data-i18n-title="opt.gameLangTitle" title="Language of the game client — used to recognise item names read from the screen"><span data-i18n="opt.gameLang">Game language</span> <select id="gameLangSel"></select></label>
+        <label class="opt-row"><span data-i18n="opt.font">Font</span> <select id="fontSel"></select></label>
         <div class="opt-div"></div>
         <button id="snd" class="opt-item">Alert: OFF</button>
         <button id="nm" class="opt-item">Names: ON</button>
         <div class="opt-div"></div>
-        <button id="optRefresh" class="opt-item">Refresh prices</button>
-        <button id="optOcr" class="opt-item">Check OCR</button>
-        <button id="optUpdate" class="opt-item">Update</button>
-        <button id="optDebug" class="opt-item">Debug</button>
+        <button id="optRefresh" class="opt-item" data-i18n="opt.refresh">Refresh prices</button>
+        <button id="optOcr" class="opt-item" data-i18n="opt.ocr">Check OCR</button>
+        <button id="optUpdate" class="opt-item" data-i18n="opt.update">Update</button>
+        <button id="optDebug" class="opt-item" data-i18n="opt.debug">Debug</button>
       </div>
     </span>
   </header>
   <div id="tab-prices" class="panel">
   <div class="btns">
-    <label class="corelbl">League:
+    <label class="corelbl"><span data-i18n="prices.league">League:</span>
       <select id="league"></select>
     </label>
-    <label class="corelbl">Hide:
+    <label class="corelbl"><span data-i18n="prices.hide">Hide:</span>
       <select id="minval">
-        <option value="0">Off</option>
+        <option value="0" data-i18n="prices.hideOff">Off</option>
         <option value="0.01">≥0.01 div</option>
         <option value="0.1">≥0.1 div</option>
         <option value="1">≥1 div</option>
@@ -255,39 +301,39 @@
       </select>
     </label>
     <span class="sep"></span>
-    <button id="sel">Select region</button>
+    <button id="sel" data-i18n="prices.selectRegion">Select region</button>
     <button id="ovl">Overlay: OFF</button>
     <span class="sep"></span>
-    <button id="scan" class="primary">Scan now</button>
+    <button id="scan" class="primary" data-i18n="prices.scanNow">Scan now</button>
   </div>
   <div id="updBanner" class="upd-banner" hidden></div>
   <div id="status" class="status">Loading…</div>
-  <div id="list" class="list"><div class="empty">No prices yet.</div></div>
+  <div id="list" class="list"><div class="empty" data-i18n="prices.noPrices">No prices yet.</div></div>
   <div class="spacer"></div>
   </div><!-- /tab-prices -->
   <div id="tab-planner" class="panel" hidden>
     <div class="btns">
-      <button id="setRuneRegion" title="Drag a box over ONE row of rune icons">Set rune region</button>
-      <button id="rdRunes" title="Detect the runes shown in the panel">Read from screen</button>
-      <button id="runeOvl" title="Show the rune recipe + price over the game (click-through)">Rune overlay: OFF</button>
-      <button id="clrRunes">Clear</button>
+      <button id="setRuneRegion" data-i18n="planner.setRegion" data-i18n-title="planner.setRegionTitle" title="Drag a box over ONE row of rune icons">Set rune region</button>
+      <button id="rdRunes" data-i18n="planner.readScreen" data-i18n-title="planner.readScreenTitle" title="Detect the runes shown in the panel">Read from screen</button>
+      <button id="runeOvl" data-i18n-title="planner.overlayTitle" title="Show the rune recipe + price over the game (click-through)">Rune overlay: OFF</button>
+      <button id="clrRunes" data-i18n="planner.clear">Clear</button>
     </div>
-    <div class="tips" id="plHelp"><b>Chain tips:</b> only the <b>gold-bordered</b> rune propagates to later Remnants — early pick for the propagated rune, late for the reward, highest-slot Remnant last. Same runes don't stack (one copy is enough). <b>SS</b> Opulent · <b>S</b> Power/Bond/Oath/Death · <b>A</b> Time/Rebirth/Soul. Avoid spreading Life. Don't reroll a Boon.</div>
+    <div class="tips" id="plHelp" data-i18n-html="planner.tips"><b>Chain tips:</b> only the <b>gold-bordered</b> rune propagates to later Remnants — early pick for the propagated rune, late for the reward, highest-slot Remnant last. Same runes don't stack (one copy is enough). <b>SS</b> Opulent · <b>S</b> Power/Bond/Oath/Death · <b>A</b> Time/Rebirth/Soul. Avoid spreading Life. Don't reroll a Boon.</div>
     <div id="plAdvice" class="mini"></div>
     <div id="plChips" class="chips"></div>
-    <div class="sec-h">Chase <span style="text-transform:none;letter-spacing:0;font-weight:normal">(jackpots · permanent boons)</span></div>
+    <div class="sec-h"><span data-i18n="planner.chase">Chase</span> <span style="text-transform:none;letter-spacing:0;font-weight:normal" data-i18n="planner.chaseSub">(jackpots · permanent boons)</span></div>
     <div id="plChase" class="chase"></div>
-    <div class="sec-h">Exact recipe</div>
-    <div id="plExact" class="plist"><div class="empty">Pick the runes shown in the Runeshape panel.</div></div>
-    <div class="sec-h">Can extend to</div>
+    <div class="sec-h" data-i18n="planner.exact">Exact recipe</div>
+    <div id="plExact" class="plist"><div class="empty" data-i18n="planner.emptyExact">Pick the runes shown in the Runeshape panel.</div></div>
+    <div class="sec-h" data-i18n="planner.more">Can extend to</div>
     <div id="plMore" class="plist"></div>
     <div id="plStatus" class="mini"></div>
   </div><!-- /tab-planner -->
   <div id="tab-combos" class="panel" hidden>
     <div class="btns">
-      <input id="cbSearch" class="cbsearch" type="search" placeholder="Search rune or reward…">
+      <input id="cbSearch" class="cbsearch" type="search" data-i18n-ph="combos.searchPh" placeholder="Search rune or reward…">
       <select id="cbCat">
-        <option value="all">All categories</option>
+        <option value="all" data-i18n="combos.allCats">All categories</option>
         <option value="Alloys">Alloys</option>
         <option value="Currency">Currency</option>
         <option value="Gems">Gems</option>
@@ -298,483 +344,19 @@
     <div class="mini" id="cbCount"></div>
     <div id="cbList" class="plist cb-list"></div>
   </div><!-- /tab-combos -->
+  <div id="tab-guide" class="panel" hidden>
+    <div id="guideBody" class="guide"></div>
+  </div><!-- /tab-guide -->
   <div class="footer">
-    <span>made by iulian.icb · <span id="ver">v—</span> · <span id="pricesTime" class="priceline">Prices updated: —</span></span>
-    <a id="bmc">☕ Buy me a coffee</a>
+    <span>made by iulian.icb · <span id="ver">v—</span> · <span id="pricesTime" class="priceline">—</span></span>
+    <a id="bmc" data-i18n="footer.bmc">☕ Buy me a coffee</a>
   </div>
 </div>
+<script src="locales.js"></script>
+<script src="i18n.js"></script>
+<script src="guide.js"></script>
 <script src="fontui.js"></script>
 <script src="runereader.js"></script>
-<script>
-const statusEl = document.getElementById("status");
-const listEl = document.getElementById("list");
-const leagueEl = document.getElementById("league");
-const pricesTimeEl = document.getElementById("pricesTime");
-const ovlBtn = document.getElementById("ovl");
-const sndBtn = document.getElementById("snd");
-const nmBtn = document.getElementById("nm");
-const minvalEl = document.getElementById("minval");
-let overlayOn = false;
-let soundOn = false;
-let namesOn = true;   // numele itemului in overlay (false = ascuns)
-let minDiv = 0;      // prag de afisare (in Divine); 0 = arata tot
-let curRows = [];
-// prag pt "market mover": variatie pe 7 zile peste care marcăm itemul ca pump
-const PUMP_PCT = 15;
-function setOvlBtn(on) { overlayOn = on; ovlBtn.textContent = "Overlay: " + (on ? "ON" : "OFF"); ovlBtn.classList.toggle("on", on); }
-function setSndBtn(on) { soundOn = on; sndBtn.textContent = "Alert: " + (on ? "ON" : "OFF"); sndBtn.classList.toggle("on", on); }
-function setNmBtn(on) { namesOn = on; nmBtn.textContent = "Names: " + (on ? "ON" : "OFF"); nmBtn.classList.toggle("on", on); }
-
-// chime scurt (doua tonuri) prin Web Audio - fara fisiere de sunet
-let audioCtx = null;
-function ping() {
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
-    const t0 = audioCtx.currentTime;
-    [880, 1318.5].forEach((f, i) => {
-      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      const s = t0 + i * 0.13;
-      o.type = "sine"; o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, s);
-      g.gain.exponentialRampToValueAtTime(0.28, s + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.28);
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start(s); o.stop(s + 0.32);
-    });
-  } catch {}
-}
-
-function setPricesTime(ts, stale) {
-  const suffix = stale ? " (cached — offline)" : "";
-  if (!ts) { pricesTimeEl.textContent = "Prices updated: never" + suffix; return; }
-  const d = new Date(ts);
-  const pad = (n) => String(n).padStart(2, "0");
-  const date = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  pricesTimeEl.textContent = `Prices updated: ${date} ${time}${suffix}`;
-}
-
-function esc(s) {
-  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
-
-// mini-grafic 7 zile din sparkline.data (aceeasi logica precum in overlay)
-function sparkSvg(data, trend) {
-  if (!Array.isArray(data) || data.length < 2) return "";
-  const w = 46, h = 14, p = 1.5;
-  const min = Math.min(...data), max = Math.max(...data);
-  const span = (max - min) || 1;
-  const pts = data.map((v, i) => {
-    const x = p + (i / (data.length - 1)) * (w - 2 * p);
-    const y = p + (1 - (v - min) / span) * (h - 2 * p);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  const col = trend === "down" ? "#8a2a2a" : trend === "up" ? "#2f6b34" : "#8a7a55";
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
-}
-
-function render(rows, error, panelMissing) {
-  curRows = error ? [] : rows;
-  if (error) { listEl.innerHTML = `<div class="err">${esc(error)}</div>`; return; }
-  // cu overlay pornit, lista dispare complet din fereastra - totul se afiseaza doar in overlay
-  if (overlayOn) { listEl.innerHTML = `<div class="empty">Prices are shown in the in-game overlay.</div>`; return; }
-  // nu suntem pe panoul Runeshaping (ex. suntem in market) -> mesaj clar, nu lista goala
-  if (panelMissing) { listEl.innerHTML = `<div class="empty">Runeshaping panel not detected — open Runeshape Combinations in game.</div>`; return; }
-  // prag de valoare: ascundem itemele sub minDiv (in Divine)
-  const shown = rows.filter((r) => (r.totalDivine || 0) >= minDiv);
-  if (!shown.length) {
-    listEl.innerHTML = `<div class="empty">` + (rows.length ? "Nothing above the value threshold." : "No items yet. Open Runeshape Combinations in game.") + `</div>`;
-    return;
-  }
-  listEl.innerHTML = shown.map((r, i) => {
-    const ico = r.icon ? `<img class="ico" src="${esc(r.icon)}" alt="">` : "";
-    const name = esc(r.matchedName || r.name);
-    const tier = r.tier ? ` ${r.tier}` : "";
-    const clickable = r.matchedName ? " clickable" : "";
-    const spark = `<span class="spark">${sparkSvg(r.trendData, r.trend)}</span>`;
-    let trend = '<span class="trend"></span>';
-    if (r.trend === "up" || r.trend === "down") {
-      const arrow = r.trend === "up" ? "▲" : "▼";
-      const pct = Number.isFinite(r.trendPct) ? " " + Math.abs(r.trendPct).toFixed(1) + "%" : "";
-      const pump = Number.isFinite(r.trendPct) && r.trendPct >= PUMP_PCT ? " pump" : "";
-      trend = `<span class="trend ${r.trend}${pump}">${arrow}${pct}</span>`;
-    }
-    const price = r.display ? esc(r.display.text) : "?";
-    return `<div class="row${tier}${clickable}" data-i="${i}">${ico}<span class="name">${name}</span>${spark}${trend}<span class="qty">${esc(r.qty)}x</span><span class="price">${price}</span></div>`;
-  }).join("");
-  // click pe un rand cu preț -> pagina itemului pe poe.ninja (volum, istoric)
-  listEl.querySelectorAll(".row.clickable").forEach((el) => {
-    el.addEventListener("click", () => {
-      const r = shown[+el.dataset.i];
-      if (r && r.matchedName) window.api.openItem({ league: leagueEl.value, category: r.category, name: r.matchedName });
-    });
-  });
-}
-
-leagueEl.onchange = async () => {
-  statusEl.textContent = "Switching league + loading prices…";
-  await window.api.setLeague(leagueEl.value);
-  statusEl.textContent = "League: " + leagueEl.value;
-  const cfg = await window.api.getConfig();
-  setPricesTime(cfg.pricesAt, cfg.pricesStale);
-  const r = await window.api.scanNow();
-  render(r.rows, r.error, r.panelMissing);
-};
-
-async function boot() {
-  const cfg = await window.api.getConfig();
-  const leagues = cfg.availableLeagues || [];
-  leagueEl.innerHTML = leagues.map(l => `<option value="${l}">${l}</option>`).join("");
-  leagueEl.value = cfg.league || leagues[0] || "";
-  setPricesTime(cfg.pricesAt, cfg.pricesStale);
-  setOvlBtn(!!cfg.overlay);
-  setSndBtn(!!cfg.soundAlert);
-  setNmBtn(!cfg.hideNames);
-  minDiv = cfg.minDivine || 0;
-  minvalEl.value = String(minDiv);
-  fontSel.value = cfg.font || FontUI.DEFAULT;
-  FontUI.apply(fontSel.value);   // font salvat (aplicat si pe overlay-uri la pornire)
-  document.getElementById("ver").textContent = "v" + (cfg.version || "?");
-  statusEl.textContent = cfg.region ? "Region set. Scanning automatically." : "Choose a region first (Select region).";
-  checkUpdateNow(true); // fire-and-forget, silent
-}
-// re-verificam update la 30 min (un build pornit de mult timp prinde noul release)
-setInterval(() => checkUpdateNow(true), 30 * 60 * 1000);
-
-document.getElementById("sel").onclick = async () => {
-  statusEl.textContent = "Drag a box over the Runeshape panel, then press Enter.";
-  await window.api.selectRegion();
-  statusEl.textContent = "Region saved. Scanning automatically.";
-};
-ovlBtn.onclick = async () => {
-  const r = await window.api.toggleOverlay(!overlayOn);
-  if (r.ok) {
-    setOvlBtn(r.on);
-    render(curRows, null);   // cu overlay ON ascundem preturile din fereastra principala
-    statusEl.textContent = r.on
-      ? "Overlay on — prices now show over the in-game panel."
-      : "Overlay off.";
-  } else {
-    statusEl.textContent = "Overlay: " + (r.error || "failed");
-  }
-};
-sndBtn.onclick = async () => {
-  const r = await window.api.setSoundAlert(!soundOn);
-  if (r.ok) {
-    setSndBtn(r.on);
-    statusEl.textContent = r.on
-      ? "Sound alert on — a chime plays when a new item is 1 Divine or more."
-      : "Sound alert off.";
-  }
-};
-nmBtn.onclick = async () => {
-  const r = await window.api.setHideNames(namesOn);   // namesOn=true -> ascunde numele
-  if (r && r.ok) {
-    setNmBtn(!r.hideNames);
-    statusEl.textContent = r.hideNames
-      ? "Overlay now shows prices only (names hidden)."
-      : "Overlay shows item names again.";
-  }
-};
-minvalEl.onchange = async () => {
-  const r = await window.api.setMinValue(parseFloat(minvalEl.value) || 0);
-  if (r && r.ok) minDiv = r.minDivine || 0;
-  render(curRows, null);   // aplica pragul imediat, fara re-scan
-  statusEl.textContent = minDiv > 0 ? `Hiding items below ${minDiv} div.` : "Showing all items.";
-};
-
-// ---------- Options (meniu dropdown: font + actiuni utilitare) ----------
-const optBtn = document.getElementById("optBtn");
-const optMenu = document.getElementById("optMenu");
-const fontSel = document.getElementById("fontSel");
-fontSel.innerHTML = FontUI.TOKENS.map((t) => `<option value="${t.id}">${t.label}</option>`).join("");
-function closeOpt() { optMenu.hidden = true; }
-optBtn.onclick = (e) => { e.stopPropagation(); optMenu.hidden = !optMenu.hidden; };
-optMenu.onclick = (e) => e.stopPropagation();   // click in meniu nu-l inchide
-document.addEventListener("click", () => closeOpt());
-fontSel.onchange = async () => {
-  const r = await window.api.setFont(fontSel.value);
-  if (r && r.ok) { FontUI.apply(r.font); statusEl.textContent = "Font: " + FontUI.byId(r.font).label + "."; }
-};
-window.api.onFont((f) => { FontUI.apply(f); fontSel.value = f; });
-document.getElementById("scan").onclick = async () => {
-  statusEl.textContent = "Scanning…";
-  const r = await window.api.scanNow();
-  render(r.rows, r.error, r.panelMissing);
-  statusEl.textContent = `Done: ${r.rows.length} rows.`;
-};
-document.getElementById("optRefresh").onclick = async () => {
-  statusEl.textContent = "Loading prices…";
-  const r = await window.api.refreshPrices();
-  if (r.at) setPricesTime(r.at, r.stale);
-  statusEl.textContent = r.ok
-    ? (r.stale ? `poe.ninja unreachable — showing cached prices (${r.count} items).` : `Prices updated: ${r.count} items.`)
-    : `Error: ${r.error}`;
-  closeOpt();
-};
-document.getElementById("optOcr").onclick = async () => {
-  statusEl.textContent = "Checking Windows OCR…";
-  const r = await window.api.checkOcr();
-  if (r.ok && r.engine) {
-    const langs = (r.langs && r.langs.length) ? r.langs.join(", ") : "profile languages";
-    statusEl.textContent = `OCR OK — engine ready (${langs}).`;
-  } else if (r.ok && !r.engine) {
-    statusEl.textContent = "OCR engine unavailable — install a Windows OCR language pack (Settings > Language).";
-  } else {
-    statusEl.textContent = "OCR check failed: " + (r.error || "unknown");
-  }
-  closeOpt();
-};
-document.getElementById("bmc").onclick = () => {
-  window.api.openExternal("https://buymeacoffee.com/iulian.icb");
-};
-
-// ---------- update (GitHub Releases) ----------
-let updateInfo = null; // { latest, current, releaseUrl, assets } cand e disponibil
-const updBanner = document.getElementById("updBanner");
-const updBtn = document.getElementById("optUpdate");
-
-async function checkUpdateNow(silent) {
-  try {
-    const r = await window.api.checkUpdate();
-    if (!r || !r.ok) { if (!silent) statusEl.textContent = "Update check failed."; return; }
-    if (r.updateAvailable) {
-      updateInfo = r;
-      updBanner.hidden = false;
-      updBanner.textContent = `⬆ Update available: v${r.latest} (you have v${r.current}) — click to open release`;
-      updBtn.textContent = "Update now";
-      if (!silent) statusEl.textContent = `Update available: v${r.latest}.`;
-    } else {
-      updateInfo = null;
-      updBanner.hidden = true;
-      updBtn.textContent = "Update";
-      if (!silent) statusEl.textContent = r.reason === "no-releases" ? "No releases published yet." : "Up to date.";
-    }
-  } catch (e) {
-    if (!silent) statusEl.textContent = "Update check failed.";
-  }
-}
-
-updBanner.onclick = () => {
-  if (updateInfo && updateInfo.releaseUrl) window.api.openExternal(updateInfo.releaseUrl);
-};
-
-updBtn.onclick = async () => {
-  if (!updateInfo) { await checkUpdateNow(false); return; } // recheck daca nu stim inca
-  statusEl.textContent = "Downloading update…";
-  updBtn.disabled = true;
-  const r = await window.api.doUpdate(); // assetul e ales in main process
-  updBtn.disabled = false;
-  if (r.ok) statusEl.textContent = r.mode === "installer"
-    ? `Installer launched: ${r.name}. Confirm closing the app to finish the update.`
-    : `Update downloaded: ${r.name}. Restarting...`;
-  else statusEl.textContent = "Update failed: " + r.error;
-  closeOpt();
-};
-document.getElementById("optDebug").onclick = () => {
-  window.api.openDebug();
-  closeOpt();
-};
-
-window.api.onScan((data) => {
-  if (data.pricesAt) setPricesTime(data.pricesAt, data.pricesStale);
-  render(data.rows, data.error, data.panelMissing);
-});
-
-// alerta sonora: item nou de la 1 Divine in sus
-window.api.onAlert((d) => {
-  ping();
-  const n = (d && d.count) || 1;
-  statusEl.textContent = n > 1
-    ? `Alert: ${n} new items worth 1 Divine or more.`
-    : "Alert: new item worth 1 Divine or more.";
-});
-
-
-// ---------- tabs ----------
-function showTab(which) {
-  const ids = { prices: "tab-prices", planner: "tab-planner", combos: "tab-combos" };
-  for (const k of Object.keys(ids)) {
-    document.getElementById(ids[k]).hidden = k !== which;
-    document.getElementById("tabBtn" + k[0].toUpperCase() + k.slice(1)).classList.toggle("active", k === which);
-  }
-}
-document.getElementById("tabBtnPrices").onclick = () => showTab("prices");
-document.getElementById("tabBtnPlanner").onclick = () => showTab("planner");
-document.getElementById("tabBtnCombos").onclick = () => showTab("combos");
-
-// ---------- Rune Planner ----------
-let plannerRunes = [];
-let plannerChase = [];
-let allRecipes = [];
-const TIER_ORDER = { SS: 0, S: 1, A: 2, B: 3, C: 4 };
-const runeCounts = new Map();   // nume runa -> numar de aparitii (suporta duplicate)
-const plExactEl = document.getElementById("plExact");
-const plMoreEl = document.getElementById("plMore");
-const plChipsEl = document.getElementById("plChips");
-const plChaseEl = document.getElementById("plChase");
-const plAdviceEl = document.getElementById("plAdvice");
-const plStatusEl = document.getElementById("plStatus");
-
-function runeShort(n) { return String(n).replace(/\s*Rune$/i, ""); }
-function dgrHtml(d) { return `<span class="dgr d${d.max}" title="Monster danger (sum ${d.sum}, max ${d.max})">DANGER ${d.sum}</span>`; }
-function selectedList() { const out = []; for (const [n, c] of runeCounts) for (let i = 0; i < c; i++) out.push(n); return out; }
-function bumpRune(name, delta) { const c = (runeCounts.get(name) || 0) + delta; if (c <= 0) runeCounts.delete(name); else runeCounts.set(name, c); }
-
-async function initPlanner() {
-  const d = await window.api.plannerData();
-  if (!d || !d.ok) { plStatusEl.textContent = "Planner data unavailable."; return; }
-  plannerRunes = d.runes;
-  plannerChase = d.chase || [];
-  allRecipes = d.recipes || [];
-  renderChips();
-  renderChase();
-  renderCombos();
-  RuneReader.init(plannerRunes).catch(() => {});
-  window.api.getConfig().then((c) => { if (c) setRuneOvlBtn(!!c.runeOverlay); }).catch(() => {});
-}
-function renderChips() {
-  const sorted = plannerRunes.slice().sort((a, b) =>
-    (TIER_ORDER[a.tier] ?? 9) - (TIER_ORDER[b.tier] ?? 9) ||
-    (b.rare ? 1 : 0) - (a.rare ? 1 : 0) ||
-    a.name.localeCompare(b.name));
-  plChipsEl.innerHTML = sorted.map((r) => {
-    const cnt = runeCounts.get(r.name) || 0;
-    const sel = cnt ? " sel" : "";
-    const rare = r.rare ? " rare" : "";
-    const badge = cnt > 1 ? `<b class="cn">×${cnt}</b>` : "";
-    const tb = (r.tier === "SS" || r.tier === "S" || r.tier === "A") ? `<b class="tb ${r.tier}" title="Propagation tier ${r.tier}">${r.tier}</b>` : "";
-    const tip = `${r.rare ? "Rare · " : ""}Tier ${r.tier} · ${r.effects.join(" · ")}\n\nLeft-click: add · Right-click: remove`;
-    return `<div class="chip${sel}${rare}" data-name="${esc(r.name)}" title="${esc(tip)}"><img src="../data/runes/rune-${esc(r.slug)}.webp" alt="">${tb}<span>${esc(runeShort(r.name))}</span>${badge}</div>`;
-  }).join("");
-  plChipsEl.querySelectorAll(".chip").forEach((c) => {
-    const n = c.dataset.name;
-    c.onclick = () => { bumpRune(n, 1); renderChips(); updatePlan(); };
-    c.oncontextmenu = (e) => { e.preventDefault(); bumpRune(n, -1); renderChips(); updatePlan(); };
-  });
-}
-function countsOf(arr) { const m = new Map(); for (const x of arr) m.set(x, (m.get(x) || 0) + 1); return m; }
-function renderChase() {
-  if (!plannerChase.length) { plChaseEl.innerHTML = ""; return; }
-  plChaseEl.innerHTML = plannerChase.map((c) => {
-    const target = countsOf(c.runes);
-    let on = runeCounts.size > 0;
-    if (on) for (const [n, cnt] of runeCounts) if ((target.get(n) || 0) < cnt) { on = false; break; }
-    const isBoon = c.kind === "boon";
-    const q = c.qty > 1 ? `${c.qty}× ` : "";
-    return `<div class="citem${on ? " on" : ""}"><span class="ck${isBoon ? " boon" : ""}">${isBoon ? "BOON" : "JACKPOT"}</span><span class="cr">${q}${esc(c.reward)}</span><span class="cu">${esc(c.runes.map(runeShort).join(" · "))}</span>${on ? '<span class="cst">on track</span>' : ""}</div>`;
-  }).join("");
-}
-function renderPlanList(el, arr, emptyMsg) {
-  if (!arr || !arr.length) { el.innerHTML = emptyMsg ? `<div class="empty">${esc(emptyMsg)}</div>` : `<div class="empty">—</div>`; return; }
-  el.innerHTML = arr.map((r) => {
-    const runes = r.runes.map(runeShort).join(" · ");
-    const extra = r.danger.extra ? `  (+${r.danger.extra} more)` : "";
-    const costTxt = r.dispCost ? ` · cost ${esc(r.dispCost)}` : "";
-    const price = r.disp ? esc(r.disp) : (r.random ? "random" : "?");
-    const q = r.qty > 1 ? `<span class="rq">${r.qty}×</span>` : "";
-    const netHtml = r.dispNet != null ? `<span class="net ${r.netPos ? "pos" : "neg"}" title="Value minus cost of input runes (excl. Verisium)">${r.netPos ? "+" : "−"}${esc(r.dispNet)}</span>` : "";
-    const boon = /boon$/i.test(r.reward) ? `<span class="boonb" title="Permanent account upgrade — do not reroll">BOON</span>` : "";
-    return `<div class="pr">${q}<span class="rname">${esc(r.reward)}<span class="sub">${esc(runes)}${extra}${costTxt}</span></span>${boon}${dgrHtml(r.danger)}${netHtml}<span class="rprice">${price}</span></div>`;
-  }).join("");
-}
-async function updatePlan() {
-  const runes = selectedList();
-  if (!runes.length) {
-    plExactEl.innerHTML = `<div class="empty">Pick the runes shown in the Runeshape panel.</div>`;
-    plMoreEl.innerHTML = "";
-    plAdviceEl.textContent = "";
-    renderChase();
-    return;
-  }
-  const res = await window.api.planRecipes(runes);
-  if (!res || !res.ok) { plExactEl.innerHTML = `<div class="err">${esc((res && res.error) || "error")}</div>`; return; }
-  renderPlanList(plExactEl, res.exact, "No exact recipe for this combination.");
-  renderPlanList(plMoreEl, res.contains, "");
-  const a = res.advice || { good: [], bad: [] };
-  const parts = [];
-  if (a.good.length) parts.push(`<span class="spread">Spread:</span> ${esc(a.good.map(runeShort).join(", "))}`);
-  if (a.bad.length) parts.push(`<span class="avoid">Avoid spreading:</span> ${esc(a.bad.map(runeShort).join(", "))}`);
-  plAdviceEl.innerHTML = parts.join(" &nbsp;·&nbsp; ");
-  renderChase();
-}
-document.getElementById("clrRunes").onclick = () => { runeCounts.clear(); renderChips(); updatePlan(); };
-
-// overlay separat de rune (fereastra proprie, click-through, in dreapta regiunii de rune)
-const runeOvlBtn = document.getElementById("runeOvl");
-function setRuneOvlBtn(on) { runeOvlBtn.textContent = "Rune overlay: " + (on ? "ON" : "OFF"); runeOvlBtn.classList.toggle("on", on); }
-runeOvlBtn.onclick = async () => {
-  const res = await window.api.toggleRuneOverlay(!runeOvlBtn.classList.contains("on"));
-  if (res && res.ok) setRuneOvlBtn(res.on);
-  else plStatusEl.textContent = "Rune overlay: " + ((res && res.error) || "failed");
-};
-window.api.onRuneOverlayState((on) => setRuneOvlBtn(on));
-
-// rune reader extracted to runereader.js (shared with the rune overlay)
-
-document.getElementById("setRuneRegion").onclick = async () => {
-  plStatusEl.textContent = "Drag a box over ONE row of rune icons, then press Enter.";
-  await window.api.selectRuneRegion();
-  plStatusEl.textContent = "Rune region saved. Now press Read from screen.";
-};
-document.getElementById("rdRunes").onclick = async () => {
-  if (!RuneReader.ready()) { plStatusEl.textContent = "Loading rune templates…"; await RuneReader.init(plannerRunes); }
-  plStatusEl.textContent = "Reading runes…";
-  const r = await window.api.captureRunes();
-  if (!r || !r.ok) { plStatusEl.textContent = "Read failed: " + ((r && r.error) || "unknown"); return; }
-  try {
-    const res = await RuneReader.detect(r.dataUrl, r.scale);
-    const det = res.det;
-    if (!det.length) { plStatusEl.textContent = "No runes detected — check the rune region."; return; }
-    // rand fara incredere mare = probabil pamant/obiecte, nu panoul Runeshape:
-    // nu importam nimic, doar spunem ce a vazut si de ce.
-    if (!res.ok) {
-      plStatusEl.textContent = "That looks like ground/objects, not the rune panel (low confidence) — nothing imported. Box ONE row of the Runeshape Combinations panel and retry.";
-      return;
-    }
-    runeCounts.clear();
-    let low = 0;
-    for (const dm of det) { if (plannerRunes.some((x) => x.name === dm.name)) bumpRune(dm.name, 1); if (dm.sc < 0.45) low++; }
-    renderChips(); updatePlan();
-    const note = res.rows > 1 ? "  — box covers " + res.rows + " rows (used the " + det.length + "-rune one); box just ONE row" : "";
-    plStatusEl.textContent = "Detected: " + det.map((dm) => runeShort(dm.name) + " (" + dm.sc.toFixed(2) + ")").join(", ") + (low ? "  — check low-confidence" : "") + note;
-  } catch (e) { plStatusEl.textContent = "Match error: " + e; }
-};
-
-// ---------- All Combos ----------
-const cbSearchEl = document.getElementById("cbSearch");
-const cbCatEl = document.getElementById("cbCat");
-const cbCountEl = document.getElementById("cbCount");
-const cbListEl = document.getElementById("cbList");
-function fmtVal(r) {
-  if (r.value == null) return r.random ? "random" : "—";
-  return "~" + r.value + " " + (r.valueCur || "");
-}
-function renderCombos() {
-  const q = cbSearchEl.value.trim().toLowerCase();
-  const cat = cbCatEl.value;
-  const arr = allRecipes.filter((r) =>
-    (cat === "all" || r.category === cat) &&
-    (!q || (r.reward + " " + r.runes.join(" ")).toLowerCase().includes(q)));
-  arr.sort((a, b) =>
-    String(a.category).localeCompare(b.category) ||
-    (b.value || 0) - (a.value || 0) ||
-    a.reward.localeCompare(b.reward));
-  cbCountEl.textContent = arr.length + " combination" + (arr.length === 1 ? "" : "s") +
-    "  ·  click a rune name in Rune Planner to find it here";
-  cbListEl.innerHTML = arr.map((r) => {
-    const runes = r.runes.map(runeShort).join(" · ");
-    const qbadge = r.qty > 1 ? `<span class="rq">${r.qty}×</span>` : "";
-    const boon = /boon$/i.test(r.reward) ? `<span class="boonb">BOON</span>` : "";
-    return `<div class="pr">${qbadge}<span class="rname">${esc(r.reward)}<span class="sub">${esc(runes)}</span></span>${boon}<span class="ctag">${esc(r.category || "")}</span>${dgrHtml(r.danger)}<span class="rprice">${esc(fmtVal(r))}</span></div>`;
-  }).join("") || `<div class="empty">No combination matches.</div>`;
-}
-cbSearchEl.oninput = renderCombos;
-cbCatEl.onchange = renderCombos;
-
-boot();
-initPlanner();
-</script>
+<script src="index.js"></script>
 </body>
 </html>

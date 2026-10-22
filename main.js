@@ -1,11 +1,18 @@
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, nativeImage, shell, clipboard } = require("electron");
+const { app, BrowserWindow, ipcMain, desktopCapturer, screen, nativeImage, shell, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { spawn } = require("child_process");
 const crypto = require("crypto");
-const { parseLines } = require("./rows");
+const { parseLines, parseRow, panelDetected } = require("./rows");
 const planner = require("./planner");
+const { GAME_LANGS, countLocalized, resolveLocalized, parseClientLang } = require("./names");
+// functii pure, testate in test/run.js (vezi lib/)
+const libText = require("./lib/text");
+const libPrices = require("./lib/prices");
+const libUpdate = require("./lib/update");
+const libNet = require("./lib/net");
+const { computeCropRect, intersect } = require("./lib/capture");
 
 // alertele sonore pornesc fara gest de utilizator (altfel AudioContext-ul din renderer e blocat)
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -29,6 +36,8 @@ if (!isSingleInstance) {
 // ---------- logging ----------
 const LOG_FILE = path.join(os.tmpdir(), "xpc-debug.log");
 let logLines = [];        // buffer circular de loguri (pt fereastra Debug)
+let logSeqs = [];        // secventele liniilor din buffer (pt trimiteri delta)
+let logSeq = 0;          // secventa monotonica a liniilor scrise
 let lastOcrLines = [];    // liniile OCR brute din ultimul scan (pt Debug)
 const LOG_BUF_MAX = 300;
 const LOG_MAX_BYTES = 1_000_000;   // ~1 MB; peste asta rotim (nu crestem la infinit in %TEMP%)
@@ -36,21 +45,43 @@ let logBytes = 0;                  // dimensiunea curenta a fisierului de log (t
 try { logBytes = fs.statSync(LOG_FILE).size; } catch { logBytes = 0; }
 function pushLog(line) {
   logLines.push(line);
-  if (logLines.length > LOG_BUF_MAX) logLines.shift();
+  logSeqs.push(++logSeq);
+  if (logLines.length > LOG_BUF_MAX) { logLines.shift(); logSeqs.shift(); }
 }
 function log(...args) {
   const line = `[${new Date().toISOString()}] ` + args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ");
+  try {
+    // scriere ASINCRONA in buffer: logul nu blocheaza event-loop-ul principal
+    // (inainte fiecare linie facea fs.appendFileSync - cost cu IPC-uri).
+    logPending += line + "\n";
+    if (logPending.length >= 64 * 1024) flushLog();
+    else scheduleLogFlush();
+  } catch {}
+  pushLog(line);
+  console.log(line);
+}
+// bufferul de log: se scrie pe disc in bucati (la 500ms), ca sa nu blochem main-ul
+const LOG_FLUSH_MS = 500;
+let logPending = "";
+let logTimer = null;
+function scheduleLogFlush() {
+  if (logTimer) return;
+  logTimer = setTimeout(() => { logTimer = null; flushLog(); }, LOG_FLUSH_MS);
+  if (logTimer.unref) logTimer.unref();
+}
+function flushLog() {
+  if (logTimer) { clearTimeout(logTimer); logTimer = null; }
+  if (!logPending) return;
+  const chunk = logPending;
+  logPending = "";
   try {
     if (logBytes > LOG_MAX_BYTES) {   // rotim: pastram o singura generatie (.1)
       try { fs.renameSync(LOG_FILE, LOG_FILE + ".1"); } catch {}
       logBytes = 0;
     }
-    const chunk = line + "\n";
-    fs.appendFileSync(LOG_FILE, chunk);
+    fs.appendFile(LOG_FILE, chunk, () => {});   // async, fara blocarea main-ului
     logBytes += Buffer.byteLength(chunk);
   } catch {}
-  pushLog(line);
-  console.log(line);
 }
 log("=== START ===");
 log("configPath:", path.join(app.getPath ? "(app not ready)" : "", "config.json"));
@@ -69,7 +100,11 @@ let ocrPending = null;    // request-ul in asteptare
 let ocrScriptTmp = null;  // path-ul la scriptul .ps1 scris in temp
 
 // ---------- OCR: Windows OCR nativ (WinRT) printr-un proces PowerShell cald ----------
-const OCR_PS1 = `Add-Type -AssemblyName System.Runtime.WindowsRuntime
+// Parametrul -Lang vine din limba jocului: motorul englez nu poate citi chirilica,
+// CJK sau thai, iar pe text latin (de/fr/...) pierde diacriticele. Daca pachetul OCR
+// cerut lipseste, recadem pe engleza si raportam motorul folosit ("engine").
+const OCR_PS1 = `param([string]$Lang = "en-US")
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
 # stdout MUSTI fie UTF-8: altfel PowerShell 5.1 scrie in codepage-ul OEM (ex. CP437,
 # unde bullet-ul "•" = byte 0x07) si Node primeste caractere de control care rup JSON-ul.
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
@@ -86,17 +121,31 @@ $null = [Windows.Globalization.Language,Windows.Globalization,ContentType=Window
 $null = [Windows.Storage.StorageFile,Windows.Storage,ContentType=WindowsRuntime]
 $null = [Windows.Graphics.Imaging.BitmapDecoder,Windows.Graphics.Imaging,ContentType=WindowsRuntime]
 $null = [Windows.Graphics.Imaging.SoftwareBitmap,Windows.Graphics.Imaging,ContentType=WindowsRuntime]
-# App-ul este doar in engleza, deci vrem explicit motorul OCR englez: pe un Windows
-# cu alta limba de afisare (fr/de/...), TryCreateFromUserProfileLanguages alege motorul
-# acelei limbi (citeste gresit textul englez) sau da NULL daca pachetul OCR de profil
-# lipseste. Fallback: limbile de profil, apoi orice limba OCR instalata.
+# Motorul cerut (limba jocului). Fallback: engleza (text latin), apoi profilul
+# utilizatorului, apoi orice motor instalat. "used" ajunge in JSON ca sa stim daca
+# pachetul OCR cerut lipseste.
 $engine = $null
-try { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language "en-US")) } catch {}
-if ($null -eq $engine) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages() }
+$used = ""
+try {
+  $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language $Lang))
+  if ($null -ne $engine) { $used = $Lang }
+} catch {}
+if ($null -eq $engine) {
+  try {
+    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage((New-Object Windows.Globalization.Language "en-US"))
+    if ($null -ne $engine) { $used = "en-US" }
+  } catch {}
+}
+if ($null -eq $engine) {
+  try {
+    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
+    if ($null -ne $engine) { $used = "profile" }
+  } catch {}
+}
 if ($null -eq $engine) {
   try {
     $avail = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages
-    if ($avail.Count -gt 0) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($avail[0]) }
+    if ($avail.Count -gt 0) { $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage($avail[0]); $used = $avail[0].LanguageTag }
   } catch {}
 }
 if ($null -eq $engine) { Write-Error "No OCR engine"; exit 1 }
@@ -128,7 +177,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
       $cleanText = ($ln.Text -replace "[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]", " ") -replace "\\s+", " "
       $lines += [ordered]@{ text = $cleanText; y = $minY; x = $minX }
     }
-    $resp = [ordered]@{ ok = $true; lines = $lines }
+    $resp = [ordered]@{ ok = $true; engine = $used; lines = $lines }
   } catch {
     $resp = [ordered]@{ ok = $false; error = $_.Exception.Message }
   }
@@ -136,11 +185,18 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   [Console]::Out.Flush()
 }
 `;
+// limba jocului -> tag-ul motorului OCR Windows
+const OCR_TAGS = {
+  en: "en-US", de: "de-DE", fr: "fr-FR", es: "es-ES", pt: "pt-BR",
+  ru: "ru-RU", ja: "ja-JP", ko: "ko-KR", th: "th-TH",
+};
+let ocrEngineTag = "";      // tag-ul procesului OCR pornit acum
+let ocrFallbackWarned = ""; // ca sa logam o singura data lipsa pachetului OCR
 function ocrScriptPath() {
   // Numele contine hash-ul continutului: daca scriptul OCR se schimba, scriem un fisier
   // NOU, ca sa nu-l reutilizam pe cel vechi/corupt ramas in temp (fisierul vechi poate fi
   // inca folosit de un proces OCR deja pornit, deci nu-l rescriem peste el).
-  const ver = require("crypto").createHash("sha1").update(OCR_PS1).digest("hex").slice(0, 8);
+  const ver = require("crypto").createHash("sha256").update(OCR_PS1).digest("hex").slice(0, 12);
   const target = path.join(os.tmpdir(), `xpc-ocr-${ver}.ps1`).replace(/\//g, "\\");
   if (ocrScriptTmp === target && fs.existsSync(target)) return target;
   if (!fs.existsSync(target)) {
@@ -151,18 +207,25 @@ function ocrScriptPath() {
   // curatenie best-effort: eliminam versiunile vechi de script (pot fi blocate -> ignoram)
   try {
     for (const f of fs.readdirSync(os.tmpdir())) {
-      if (/^xpc-ocr(-v?[0-9a-f]{8})?\.ps1$/.test(f) && f !== path.basename(target)) {
+      if (/^xpc-ocr(-v?[0-9a-f]{8,64})?\.ps1$/.test(f) && f !== path.basename(target)) {
         try { fs.unlinkSync(path.join(os.tmpdir(), f)); } catch {}
       }
     }
   } catch {}
   return ocrScriptTmp || target;
 }
-function ensureOcrProc() {
-  if (ocrProc && !ocrProc.killed) return ocrProc;
+function ensureOcrProc(tag) {
+  tag = tag || OCR_TAGS.en;
+  if (ocrProc && !ocrProc.killed) {
+    if (ocrEngineTag === tag) return ocrProc;
+    // alta limba: motorul WinRT e ales la pornire, deci repornim procesul
+    try { ocrProc.kill(); } catch {}
+    ocrProc = null;
+  }
+  ocrEngineTag = tag;
   ocrProc = spawn(
     "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-NoLogo", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ocrScriptPath()],
+    ["-NoProfile", "-NonInteractive", "-NoLogo", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File", ocrScriptPath(), "-Lang", tag],
     { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }
   );
   ocrProc.stdout.setEncoding("utf8");
@@ -205,7 +268,7 @@ function ocrRecognize(imagePath) {
       ocrProc = null;
       ocrPending = null;
     }
-    const proc = ensureOcrProc();
+    const proc = ensureOcrProc(OCR_TAGS[gameLang] || OCR_TAGS.en);
     const timer = setTimeout(() => {
       // Proces blocat: il omoram ca urmatorul scan sa porneasca proaspat.
       log("OCR timeout: killing OCR process (self-heal)");
@@ -214,7 +277,16 @@ function ocrRecognize(imagePath) {
       ocrPending = null;
       resolve({ ok: false, error: "OCR timeout" });
     }, 20000);
-    ocrPending = (result) => { clearTimeout(timer); ocrPending = null; resolve(result); };
+    ocrPending = (result) => {
+      clearTimeout(timer);
+      ocrPending = null;
+      const want = OCR_TAGS[gameLang] || OCR_TAGS.en;
+      if (result && result.engine && result.engine !== want && result.engine !== "profile" && ocrFallbackWarned !== want) {
+        ocrFallbackWarned = want;
+        log("OCR: pachetul", want, "nu e instalat; folosesc", result.engine, "- instaleaza limba OCR Windows pentru acuratete");
+      }
+      resolve(result);
+    };
     try { proc.stdin.write(imagePath + "\n"); }
     catch (e) {
       clearTimeout(timer);
@@ -293,13 +365,42 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
 `;
 let fgProc = null, fgBuf = "", fgPending = null;
 function fgScriptPath() {
-  const ver = require("crypto").createHash("sha1").update(FG_PS1).digest("hex").slice(0, 8);
+  const ver = require("crypto").createHash("sha256").update(FG_PS1).digest("hex").slice(0, 12);
   const target = path.join(os.tmpdir(), `xpc-fg-${ver}.ps1`).replace(/\//g, "\\");
   if (!fs.existsSync(target)) {
     try { fs.writeFileSync(target, FG_PS1, "utf8"); }
     catch (e) { log("fgScriptPath: cannot write script:", String(e)); }
   }
+  // curatenie: versiunile vechi ale scriptului fg
+  try {
+    for (const f of fs.readdirSync(os.tmpdir())) {
+      if (/^xpc-fg-[0-9a-f]{8,64}\.ps1$/.test(f) && f !== path.basename(target)) {
+        try { fs.unlinkSync(path.join(os.tmpdir(), f)); } catch {}
+      }
+    }
+  } catch {}
   return target;
+}
+// ---------- curatenie %TEMP% (audit E3) ----------
+// Fiecare scan lasa un PNG in %TEMP%. Daca aplicatia se inchide sau crasa intre
+// scriere si stergere, fisierele raman. La pornire curatam PNG-urile vechi.
+const TEMP_PNG_MAX_AGE_MS = 60 * 60 * 1000;
+function sweepTempFiles() {
+  let removed = 0;
+  try {
+    const dir = os.tmpdir();
+    const now = Date.now();
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.startsWith("xpc") || !f.endsWith(".png")) continue;
+      if (f.startsWith("xpc-rune-frame")) continue;   // cele 2 frame-uri rotitoare (se suprascriu)
+      const p = path.join(dir, f);
+      try {
+        const st = fs.statSync(p);
+        if (now - st.mtimeMs > TEMP_PNG_MAX_AGE_MS) { fs.unlinkSync(p); removed++; }
+      } catch {}
+    }
+  } catch {}
+  if (removed) log("temp: curatat", removed, "PNG-uri vechi");
 }
 function ensureFgProc() {
   if (fgProc && !fgProc.killed) return fgProc;
@@ -379,6 +480,7 @@ async function captureRunesFast() {
 let lastRows = [];
 let scanning = false;        // guard: nu suprapunem doua scan-uri (poll + buton)
 let lastScanHash = null;     // hash-ul ultimei capturi OCR-uite (skip daca ecranul n-a schimbat)
+let lastScanLang = "";       // limba jocului la ultimul scan (cache-ul de imagine depinde de ea)
 let lastScanPricesAt = 0;    // fetchedAt-ul preturilor de la ultimul OCR (refacem daca s-au schimbat)
 const ALERT_MIN_DIVINE = 1;  // alerta sonora: item (stack) de la 1 Divine in sus
 let lastAlertSet = new Set();// itemele scumpe de la scanul anterior (ca sa nu sunăm repetat)
@@ -497,36 +599,21 @@ async function checkUpdate() {
 
 // Alege asset-ul de ACELASI TIP: instalat -> Setup, portable -> exe-ul portable.
 // (altfel o instalare s-ar trezi cu o copie portable in %TEMP% si invers)
+// Implementarea e in lib/update.js (functie pura, testata).
 function pickAsset(assets) {
-  if (!assets || !assets.length) return null;
-  const setup = assets.find((a) => /setup/i.test(a.name));
-  const portable = assets.find((a) => !/setup/i.test(a.name));
-  return IS_PORTABLE ? (portable || setup) : (setup || portable);
+  return libUpdate.pickAsset(assets, IS_PORTABLE);
 }
 
 async function doUpdate(asset) {
   if (!asset || !asset.url) throw new Error("No asset to download");
-  // Doar host-uri GitHub: asset-ul vine din release-ul nostru, niciodata un URL arbitrar.
-  const host = new URL(asset.url).hostname;
-  if (!/^(github\.com|objects\.githubusercontent\.com)$/i.test(host)) {
-    throw new Error("Blocked download host: " + host);
-  }
   const dest = path.join(os.tmpdir(), asset.name.replace(/[^\w.\- ]+/g, "_"));
   const r = await fetch(asset.url, { headers: { "User-Agent": NINJA_UA } });
   if (!r.ok) throw new Error(`Download failed (HTTP ${r.status})`);
   const buf = Buffer.from(await r.arrayBuffer());
-  // Integritate: dimensiunea + sha256 (din metadatele release-ului GitHub).
-  // Daca nu se potrivesc, NU rulam binarul corupt/alterat.
-  if (asset.size && buf.length !== asset.size) {
-    throw new Error(`Size mismatch (expected ${asset.size}, got ${buf.length}) — download aborted`);
-  }
-  if (asset.sha256) {
-    const h = crypto.createHash("sha256").update(buf).digest("hex");
-    if (h !== asset.sha256) throw new Error("SHA-256 mismatch — download aborted");
-    log(`update: sha256 ok (${h})`);
-  } else {
-    log("update: release without sha256 - integrity check skipped");
-  }
+  // INTEGRITATE (audit S2): host + dimensiune + sha256 - OBLIGATORIU.
+  // Daca release-ul nu are digest, NU pornim binarul (nu mai exista "skip" implicit).
+  const v = libUpdate.verifyAsset(asset, buf);
+  log(`update: sha256 ok (${v.sha256})`);
   fs.writeFileSync(dest, buf);
   log(`update: downloaded ${asset.name} (${buf.length} bytes) -> ${dest}`);
   if (IS_PORTABLE) {
@@ -549,7 +636,8 @@ async function doUpdate(asset) {
 // primaryValue = pret in moneda PRIMARA a ligii (core.primary: de obicei "divine",
 // dar pe hardcore poate fi "exalted"). Normalizam totul la "per 1 Divine" mai jos.
 const NINJA_BASE = "https://poe.ninja/poe2/api/economy";
-const NINJA_UA = "PathOfExpedition/1.0 (desktop app; contact: local)";
+// User-Agent cu versiunea reala a aplicatiei (era hardcodat "1.0")
+const NINJA_UA = `PathOfExpedition/${app.getVersion()} (desktop app; contact: local)`;
 // Categoriile care apar efectiv ca recompense in panoul Runeshape/Expedition.
 // Restul categoriilor din poe.ninja nu apar niciodata in panou si doar
 // maresc suprafata de potriviri fuzzy gresite.
@@ -560,7 +648,7 @@ const NINJA_TYPES = ["Currency", "Runes", "Expedition", "Verisium", "UncutGems"]
 // are date reale de exchange pentru ea); "Hardcore" permanent e omis intentionat
 // (poe.ninja n-are date de exchange pentru el).
 const AVAILABLE_LEAGUES = ["Forbidden Rites", "HC Forbidden Rites", "Runes of Aldur", "HC Runes of Aldur", "Standard"];
-let priceCache = { map: {}, fetchedAt: 0 };   // map: nameLower -> {price, id, name}; price = in Divine
+let priceCache = { map: {}, keys: [], keysByLength: {}, fetchedAt: 0 };   // map: nameLower -> {price, id, name}; price = in Divine
 let pricesStale = false;                      // true = afisam prețuri din snapshot local (offline)
 const PRICE_TTL = 5 * 60 * 1000;               // 5 min (respectam cache-ul lor ~5 min)
 // ---------- offline cache: ultimul snapshot de prețuri pe disk ----------
@@ -580,7 +668,8 @@ function loadPricesSnapshot(league) {
     const map = j.map;
     const keysByLength = {};
     for (const k of Object.keys(map)) (keysByLength[k.length] = keysByLength[k.length] || []).push(k);
-    priceCache = { map, keysByLength, fetchedAt: j.fetchedAt || 0 };
+    priceCache = { map, keys: Object.keys(map), keysByLength, fetchedAt: j.fetchedAt || 0 };
+    clearPriceMemo();
     pricesStale = true;
     log("prices from local cache (offline):", Object.keys(map).length, "items");
     return true;
@@ -611,16 +700,133 @@ function sparkData(sp) {
   const nums = d.map((v) => Math.round(parseFloat(v) * 10) / 10).filter((v) => Number.isFinite(v));
   return nums.length >= 2 ? nums : null;
 }
-function normName(s) {
-  return (s || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+function normName(s) { return libText.normName(s); }
 // pentru matching: normalizeaza si posesivele (jeweller s -> jewellers)
-function matchKey(s) {
-  return normName(s).replace(/\b(\w+) s\b/g, "\$1s").replace(/\s+/g, " ").trim();
+function matchKey(s) { return libText.matchKey(s); }
+
+// ---------- nume localizate (joc in alta limba decat engleza) ----------
+// Harta "<nume localizat normalizat>" -> "<nume englezesc>" e generata de
+// tools/build-names.js din lista oficiala de trade (ID-uri comune intre limbi).
+const nameMaps = new Map(); // lang -> { "nume localizat normalizat": "nume englezesc" }
+let gameLang = "en";        // limba rezolvata acum (vezi resolveGameLang)
+function loadNameMap(lang) {
+  if (!GAME_LANGS.includes(lang) || lang === "en") return null;
+  if (nameMaps.has(lang)) return nameMaps.get(lang);
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, "data", "names", lang + ".json"), "utf8");
+    const obj = JSON.parse(raw);
+    nameMaps.set(lang, obj);
+    log("names: harta", lang, "incarcata,", Object.keys(obj).length, "intrari");
+    return obj;
+  } catch (e) {
+    log("names: nu pot citi harta", lang, e.message);
+    nameMaps.set(lang, null);
+    return null;
+  }
+}
+// inversul hartii (englez -> localizat) pentru numele afisate in UI
+const revMaps = new Map(); // lang -> { "nume englezesc": "nume localizat" } | null
+function loadRevMap(lang) {
+  if (!GAME_LANGS.includes(lang) || lang === "en") return null;
+  if (revMaps.has(lang)) return revMaps.get(lang);
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, "data", "names", "rev-" + lang + ".json"), "utf8");
+    const obj = JSON.parse(raw);
+    revMaps.set(lang, obj);
+    return obj;
+  } catch {
+    revMaps.set(lang, null);
+    return null;
+  }
+}
+// numele afisat in UI: in limba aplicatiei cand avem traducerea, altfel englezesc
+function uiNameOf(row) {
+  if (!row.matchedName) return null;
+  if (config.lang === "en") return row.matchedName;
+  const rev = loadRevMap(config.lang);
+  if (rev && rev[row.matchedName]) return rev[row.matchedName];
+  if (config.lang === gameLang) return row.name;   // numele citit de OCR e deja in limba asta
+  return row.matchedName;
+}
+function relocalizeRows() {
+  for (const r of lastRows) r.displayName = uiNameOf(r);
+}
+// OCR-ul citeste numele in limba jocului; preturile sunt pe nume englezesti.// Daca textul citit nu e in harta, il lasam neatins (numele englezesti trec direct).
+function localizedToEnglish(name) {
+  if (!gameLang || gameLang === "en") return name;
+  const dict = loadNameMap(gameLang);
+  if (!dict) return name;
+  return resolveLocalized(dict, name) || name;
+}
+// "auto" = limba clientului PoE2 (cea mai sigura sursa, scrisa de joc in
+// poe2_production_Config.ini). Daca nu gasim configul, limba UI daca e limba de joc,
+// altfel prima limba OCR instalata in Windows care are si harta de nume.
+function clientConfigPaths() {
+  const dirs = [];
+  try { dirs.push(app.getPath("documents")); } catch {}
+  const home = process.env.USERPROFILE;
+  if (home) {
+    dirs.push(path.join(home, "Documents"));
+    dirs.push(path.join(home, "OneDrive", "Documents"));
+  }
+  const out = [];
+  for (const d of dirs) {
+    if (!d) continue;
+    out.push(path.join(d, "My Games", "Path of Exile 2", "poe2_production_Config.ini"));
+    out.push(path.join(d, "My Games", "Path of Exile 2", "production_Config.ini"));
+  }
+  return out;
+}
+function detectClientLang() {
+  for (const p of clientConfigPaths()) {
+    try {
+      const code = parseClientLang(fs.readFileSync(p, "utf8"));
+      if (code) return code;
+    } catch {}
+  }
+  return null;
+}
+let ocrLangsProbe = null;
+async function resolveGameLang() {
+  const want = config.gameLang || "auto";
+  if (want !== "auto") return GAME_LANGS.includes(want) ? want : "en";
+  const client = detectClientLang();
+  if (client) return client;
+  if (config.langAuto && GAME_LANGS.includes(config.lang)) return config.lang;
+  if (!ocrLangsProbe) {
+    ocrLangsProbe = checkOcrHealth()
+      .then((r) => (r && r.ok && Array.isArray(r.langs) ? r.langs : []))
+      .catch(() => []);
+  }
+  const langs = await ocrLangsProbe;
+  for (const tag of langs || []) {
+    const code = String(tag).slice(0, 2).toLowerCase();
+    if (code !== "en" && GAME_LANGS.includes(code) && loadNameMap(code)) return code;
+  }
+  return "en";
+}
+async function refreshGameLang() {
+  try {
+    const prev = gameLang;
+    gameLang = await resolveGameLang();
+    if (gameLang !== prev) { log("names: limba jocului =", gameLang); clearPriceMemo(); }
+  } catch { gameLang = "en"; }
+}
+// "auto" + UI engleza nu stie in ce limba e jocul. Dupa primul OCR putem recunoaste
+// limba dupa numele itemelor: numaram cate linii exista exact in harta fiecarei limbi.
+// (Merge si cand motorul OCR e englezesc si pierde diacriticele - normU le scoate.)
+function detectGameLang(lines) {
+  // numele curat (fara "3x"/"IX" citit greu), ca sa potrivim exact in harta
+  const names = lines.map((l) => { const r = parseRow(l.text); return r ? r.name : l.text; });
+  let best = null;
+  for (const lang of GAME_LANGS) {
+    if (lang === "en") continue;
+    const dict = loadNameMap(lang);
+    if (!dict) continue;
+    const score = countLocalized(dict, names);
+    if (score >= 2 && (!best || score > best.score)) best = { lang, score };
+  }
+  return best;
 }
 // Tier de valoare ABSOLUT (in Divine), folosit pt evidentierea randurilor in UI.
 // Praguri fixe ca sa fie constante intre scanuri (nu relative la ce e pe ecran):
@@ -695,94 +901,49 @@ async function fetchPrices(league) {
     if (loadPricesSnapshot(league)) return priceCache.map;
   }
   pricesStale = false;
-  priceCache = { map, keysByLength, fetchedAt: Date.now() };
+  priceCache = { map, keys: Object.keys(map), keysByLength, fetchedAt: Date.now() };
+  clearPriceMemo();
   savePricesSnapshot();
   log("fetchPrices: DONE total", Object.keys(map).length, "items");
   return map;
 }
 // --- matching fuzzy (OCR garble: "Chaos"->"Chao", "Jeweller's"->"Jeweller s") ---
-function levenshtein(a, b) {
-  if (a === b) return 0;
-  const m = a.length, n = b.length;
-  if (m === 0) return n;
-  if (n === 0) return m;
-  let prev = new Array(n + 1);
-  let cur = new Array(n + 1);
-  for (let j = 0; j <= n; j++) prev[j] = j;
-  for (let i = 1; i <= m; i++) {
-    cur[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-    }
-    [prev, cur] = [cur, prev];
-  }
-  return prev[n];
-}
-// similaritate 0..1 intre doua chei normalizate (edit-distance, FARA bonus de substring)
-function keySimilarity(a, b) {
-  if (a === b) return 1;
-  const maxLen = Math.max(a.length, b.length);
-  if (maxLen === 0) return 1;
-  return 1 - levenshtein(a, b) / maxLen;
-}
-// fallback pentru cifre OCR confundate cu litere (0->o, 1->l, 5->s, 8->b)
-function digitFold(s) {
-  return s.replace(/0/g, "o").replace(/1/g, "l").replace(/5/g, "s").replace(/8/g, "b");
-}
-// gemurile necizelate au preturi foarte diferite intre niveluri: fara nivel citit -> fara pret
-function isUncutGem(key) {
-  return /uncut (skill|spirit|support) gem/.test(key);
-}
+// Implementarea e in lib/prices.js (functii pure, testate in test/run.js).
+const levenshtein = libText.levenshtein;
+const keySimilarity = libText.keySimilarity;
+const digitFold = libText.digitFold;
+const isUncutGem = libText.isUncutGem;
 // prag-uri pentru matching
-const PREFIX_MIN_LENGTH = 10;
-const FUZZY_MIN_LENGTH = 6;
-const FUZZY_THRESHOLD = 0.84;
-const HIGH_CONFIDENCE_THRESHOLD = 0.92;
+const PREFIX_MIN_LENGTH = libPrices.PREFIX_MIN_LENGTH;
+const FUZZY_MIN_LENGTH = libPrices.FUZZY_MIN_LENGTH;
+const FUZZY_THRESHOLD = libPrices.FUZZY_THRESHOLD;
+const HIGH_CONFIDENCE_THRESHOLD = libPrices.HIGH_CONFIDENCE_THRESHOLD;
 // cel mai bun candidat fuzzy: doar chei cu lungime in [len-3, len+3], scor edit-distance
 function bestFuzzyMatch(name) {
-  let bestKey = null;
-  let bestScore = FUZZY_THRESHOLD; // trebuie sa depaseasca strict pragul
-  for (let len = Math.max(0, name.length - 3); len <= name.length + 3; len++) {
-    const bucket = priceCache.keysByLength[len];
-    if (!bucket) continue;
-    for (const k of bucket) {
-      const s = keySimilarity(name, k);
-      if (s > bestScore) { bestScore = s; bestKey = k; }
-    }
-  }
-  return bestKey ? { key: bestKey, score: bestScore } : null;
+  return libPrices.bestFuzzyMatch(name, priceCache.keysByLength);
 }
 // exact -> digit-fold exact -> prefix (>=10) -> fuzzy (>=6, bucket ±3, 0.84)
 // NU folosim "contains": altfel "mind rune"
 // s-ar potrivi gresit cu "perfect mind rune".
+//
+// MEMOIZARE (audit P2): planner-ul apeleaza lookupPrice de cate ori pentru fiecare
+// reteza -> ~1700 cautari/click. Memoizam rezultatul pe nume; cache-ul se invalideaza
+// cand se schimba harta de preturi sau limba jocului (gameLang).
+const priceMemo = new Map();
+const PRICE_MEMO_MAX = 5000;
+function clearPriceMemo() { priceMemo.clear(); }
 function lookupPrice(name) {
-  const key = matchKey(name);
-  if (!key) return null;
-  const hit = (k, exact) => ({ ...priceCache.map[k], matchedKey: k, exact });
-  // 1. exact
-  if (priceCache.map[key]) return hit(key, true);
-  // 2. gem fara nivel citit / fara potrivire exacta -> necunoscut (nu ghicim nivelul)
-  if (isUncutGem(key)) return null;
-  // 3. digit-folded exact
-  if (/\d/.test(key)) {
-    const folded = digitFold(key);
-    if (folded !== key && priceCache.map[folded]) return hit(folded, true);
-  }
-  // 4. prefix (doar nume lungi; extrage cheia cea mai scurta care incepe cu numele)
-  if (key.length >= PREFIX_MIN_LENGTH) {
-    let bestKey = null;
-    for (const k of Object.keys(priceCache.map)) {
-      if (k.startsWith(key) && (bestKey === null || k.length < bestKey.length)) bestKey = k;
-    }
-    if (bestKey !== null) return hit(bestKey, true);
-  }
-  // 5. fuzzy (edit-distance, bucket de lungime)
-  if (key.length >= FUZZY_MIN_LENGTH) {
-    const f = bestFuzzyMatch(key);
-    if (f) return hit(f.key, f.score >= HIGH_CONFIDENCE_THRESHOLD);
-  }
-  return null;
+  const k = typeof name === "string" ? name : String(name == null ? "" : name);
+  if (priceMemo.has(k)) return priceMemo.get(k);
+  const r = libPrices.lookupPrice(k, {
+    map: priceCache.map,
+    keys: priceCache.keys,
+    keysByLength: priceCache.keysByLength,
+    toEnglish: localizedToEnglish,
+  });
+  if (priceMemo.size > PRICE_MEMO_MAX) priceMemo.clear();
+  priceMemo.set(k, r);
+  return r;
 }
 
 // ---------- afisare preț in moneda corecta (logica autoCurrency) ----------
@@ -842,11 +1003,14 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 function loadConfig() {
-  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false, font: "segoe" };
+  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false, font: "segoe", lang: "en", langAuto: true, gameLang: "auto" };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
     log("loadConfig: read", raw.length, "chars");
     const cfg = Object.assign({}, defaults, JSON.parse(raw));
+    // migrare: pana acum "en" era doar default-ul, nu o alegere explicita -> auto.
+    // O limba aleasa manual (de/fr/...) ramane fixa.
+    if (cfg.langAuto === undefined) cfg.langAuto = cfg.lang === "en";
     log("loadConfig: OK");
     return cfg;
   } catch (e) {
@@ -887,7 +1051,27 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
   win.once("ready-to-show", () => win.show());
-  win.on("unresponsive", () => log("WINDOW UNRESPONSIVE (main window)"));
+  win.on("unresponsive", () => {
+    // audit S6: nu doar in log - anuntam interfata, ca utilizatorul sa stie ce se intampla.
+    // Daca fereastra ramane blocata, o reimprospatam dupa 10s (recuperare reala).
+    log("WINDOW UNRESPONSIVE (main window)");
+    try { if (!win.isDestroyed()) win.webContents.send("app-notice", { kind: "unresponsive" }); } catch {}
+    if (win.__reloadTimer) return;
+    win.__reloadTimer = setTimeout(() => {
+      win.__reloadTimer = null;
+      try {
+        if (win && !win.isDestroyed() && win.webContents.isLoading() === false) {
+          log("WINDOW still unresponsive -> reloading renderer");
+          win.webContents.reload();
+        }
+      } catch {}
+    }, 10000);
+    if (win.__reloadTimer.unref) win.__reloadTimer.unref();
+  });
+  win.on("responsive", () => {
+    log("WINDOW RESPONSIVE again");
+    try { if (win.__reloadTimer) { clearTimeout(win.__reloadTimer); win.__reloadTimer = null; } } catch {}
+  });
   win.on("responsive", () => log("window responsive again"));
   win.setMenuBarVisibility(false);   // fara meniul File/Edit/View (neprofesional)
   win.on("close", () => {
@@ -916,43 +1100,42 @@ async function captureRegion(region) {
   });
   const src = sources.find((s) => s.display_id === String(disp.id)) || sources[0];
   const size = src.thumbnail.getSize();
-  const bmp = src.thumbnail.toBitmap();
-  const W = size.width;
-  const H = size.height;
-  // convertim coordonatele regiunii (DIP) in pixeli
-  const kx = W / disp.bounds.width;
-  const ky = H / disp.bounds.height;
-  const px = Math.round((region.x - disp.bounds.x) * kx);
-  const py = Math.round((region.y - disp.bounds.y) * ky);
-  const pw = Math.round(region.width * kx);
-  const ph = Math.round(region.height * ky);
-  // crop din bitmap (BGRA)
-  const full = new Uint8Array(bmp.buffer, bmp.byteOffset, bmp.length);
-  const out = new Uint8Array(pw * ph * 4);
-  for (let y = 0; y < ph; y++) {
-    const sy = py + y;
-    if (sy < 0 || sy >= H) continue;
-    for (let x = 0; x < pw; x++) {
-      const sx = px + x;
-      if (sx < 0 || sx >= W) continue;
-      const si = (sy * W + sx) * 4;
-      const di = (y * pw + x) * 4;
-      out[di] = full[si];
-      out[di + 1] = full[si + 1];
-      out[di + 2] = full[si + 2];
-      out[di + 3] = 255;
+  // PERFORMANTA: decupam NATIV (nativeImage.crop) in loc sa parcurgem pixelii
+  // intregului ecran in JS (la 4K erau ~33MB copiati + parcursi la fiecare scan).
+  // Geometria e in lib/capture.js (functie pura, testata).
+  const rect = computeCropRect(region, disp.bounds, size);
+  const out = new Uint8Array(Math.max(0, rect.pw) * Math.max(0, rect.ph) * 4);
+  const cut = intersect(rect);
+  if (cut.iw > 0 && cut.ih > 0) {
+    const cropped = src.thumbnail.crop({ x: cut.ix, y: cut.iy, width: cut.iw, height: cut.ih });
+    const bmp = cropped.toBitmap();     // BGRA, doar regiunea
+    for (let y = 0; y < cut.ih; y++) {
+      const di0 = ((y + cut.dy) * rect.pw + cut.dx) * 4;
+      const si0 = y * cut.iw * 4;
+      for (let x = 0; x < cut.iw; x++) {
+        const di = di0 + x * 4;
+        const si = si0 + x * 4;
+        out[di] = bmp[si];
+        out[di + 1] = bmp[si + 1];
+        out[di + 2] = bmp[si + 2];
+        out[di + 3] = 255;
+      }
     }
   }
-  return { width: pw, height: ph, data: out };
+  return { width: rect.pw, height: rect.ph, data: out };
 }
-// Ancor de panou: titlul "Runeshape Combinations" (OCR il da ca "Runeshape Combinati0M").
-// E specific panoului de runeshaping si NU apare in market/altceva -> il folosim ca gate:
-// daca lipseste din OCR, nu suntem pe panou si nu arat nimic (evita false positives din market).
-const PANEL_ANCHOR = /runeshape|ruweshape|runeshupe|combin/i;
+// Ancor de panou: titlul "Runeshape Combinations" (OCR il da ca "Runeshape Combinati0M"),
+// respectiv traducerile lui ("Runenform-Kombinationen", "ルーンの組み合わせ", ...).
+// PANEL_ANCHOR vine din rows.js (aceeasi lista e folosita si la respingerea titlului
+// ca rand de item). E specific panoului de runeshaping si NU apare in market -> gate:
+// daca lipseste din OCR, nu suntem pe panou si nu arat nimic (evita false positives).
 async function doScan(force) {
   if (selectOpen) { log("doScan: selectOpen, skipped"); return { rows: [], error: null };
   }
-  if (!config.region) { log("doScan: no region"); return { rows: [], error: "Choose a region first (Select region)." };
+  if (!config.region) {
+    log("doScan: no region");
+    // errorKey -> mesajul e tradus in UI (nu trimitem text englezesc in interfata)
+    return { rows: [], error: null, errorKey: "err.noRegion" };
   }
   try {
     let shot = await captureRegion(config.region);
@@ -960,10 +1143,23 @@ async function doScan(force) {
     // PERFORMANTA: daca pixelii regiunii sunt identici cu ultimul scan SI preturile
     // nu s-au reimprospatat, nu mai pornim OCR-ul (cel mai scump pas) - refolosim
     // ultimul rezultat. Asa nu mai consumam CPU la fiecare 3s cand nu se schimba nimic.
-    const pHash = crypto.createHash("sha1")
+    const pHash = crypto.createHash("sha256")
       .update(Buffer.from(shot.data.buffer, shot.data.byteOffset, shot.data.byteLength))
       .digest("hex");
-    if (!force && pHash === lastScanHash && priceCache.fetchedAt === lastScanPricesAt) {
+    // limba jocului se poate schimba din joc (configul PoE2) - o recitim la fiecare
+    // scan in modul auto, ca sa folosim motorul OCR si harta corecta imediat.
+    let langChanged = false;
+    if ((config.gameLang || "auto") === "auto") {
+      const c = detectClientLang();
+      if (c && c !== gameLang) {
+        log("names: limba jocului (config joc) =", c);
+        gameLang = c;
+        clearPriceMemo();
+        langChanged = true;
+        lastScanHash = null;
+      }
+    }
+    if (!force && pHash === lastScanHash && lastScanLang === gameLang && priceCache.fetchedAt === lastScanPricesAt) {
       return { rows: lastRows, at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale, unchanged: true };
     }
     log("doScan: START");
@@ -979,12 +1175,24 @@ async function doScan(force) {
       .map((l) => ({ text: (l.text || "").trim(), y: l.y || 0 }))
       .filter((l) => l.text.length > 0);
     lastOcrLines = lines.map((l) => l.text);   // pt fereastra Debug
+    // "auto": daca UI-ul nu e limba jocului (ex. UI en, joc german), recunoastem
+    // limba dupa numele citite, ca sa aplicam harta corecta si motorul OCR potrivit.
+    if ((config.gameLang || "auto") === "auto") {
+      const guess = detectGameLang(lines);
+      if (guess && guess.lang !== gameLang) {
+        log("names: limba jocului detectata din OCR =", guess.lang, "(" + guess.score + " nume)");
+        gameLang = guess.lang;
+        clearPriceMemo();
+        langChanged = true;   // urmatorul scan reface OCR-ul cu motorul limbii detectate
+      }
+    }
     // GATE de panou: fara ancorul "Runeshape Combinations" nu suntem pe panou
     // (ex. suntem in market) -> golim, ca sa nu arat itemi din alte ecrane.
-    if (!lines.some((l) => PANEL_ANCHOR.test(l.text))) {
+    if (!panelDetected(lines)) {
       log("doScan: panel anchor MISSING (not on Runeshaping) -> clearing");
       lastRows = [];
-      lastScanHash = pHash;
+      lastScanHash = langChanged ? null : pHash;
+      lastScanLang = gameLang;
       lastScanPricesAt = priceCache.fetchedAt;
       return { rows: [], at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale, panelMissing: true };
     }
@@ -1021,9 +1229,11 @@ async function doScan(force) {
     }
     // Tier pe valoare absoluta (in Divine) -> colorare constanta in UI.
     for (const r of kept) r.tier = valueTier(r.totalDivine);
+    for (const r of kept) r.displayName = uiNameOf(r);   // numele in limba UI
     rows.length = 0; rows.push(...kept);
     lastRows = rows;
-    lastScanHash = pHash;
+    lastScanHash = langChanged ? null : pHash;   // null -> scanul urmator reface OCR-ul
+    lastScanLang = gameLang;
     lastScanPricesAt = priceCache.fetchedAt;
     log("doScan: rows=", rows.length, "(filtered", filtered + ")", JSON.stringify(rows.map((r) => r.qty + "x" + r.name)));
     // ALERTA SONORA: item nou (fata de scanul anterior) cu valoare >= 1 Divine.
@@ -1110,7 +1320,7 @@ function sendOverlay(r) {
   // IPC si nu mai re-randam overlay-ul (malloc inutil). k intra in semnatura pt ca
   // pozitionarea barelor depinde de scale.
   const sig = JSON.stringify([k, !!payload.pricesStale, config.minDivine, !!config.hideNames,
-    (payload.rows || []).map((x) => [x.name, x.y, x.dispUnit, x.dispTotal, x.trend, x.trendPct, x.tier, x.icon])]);
+    (payload.rows || []).map((x) => [x.displayName || x.name, x.y, x.dispUnit, x.dispTotal, x.trend, x.trendPct, x.tier, x.icon])]);
   if (sig === lastOverlaySig) return;
   lastOverlaySig = sig;
   // inaltimea ferestrei urmeaza intinderea randurilor (nu tot panoulul -> mai putin lag);
@@ -1299,15 +1509,12 @@ ipcMain.handle("do-update", async () => {
   }
 });
 // deschide un link extern in browserul implicit; doar URL-uri allowlist-uite
-// (buymeacoffee + release page + pagini de item poe.ninja), ca un renderer
-// compromis sa nu poata deschide orice.
-const EXTERNAL_ALLOW = [
-  /^https:\/\/buymeacoffee\.com\/iulian\.icb\/?$/i,
-  /^https:\/\/github\.com\/iulicafarafrica\/PathOfExpedition2(\/|$)/i,
-  /^https:\/\/poe\.ninja\/poe2\/economy\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/?$/i,
-];
+// (buymeacoffee + release page + pagini de item poe.ninja + creditele din Guide),
+// ca un renderer compromis sa nu poata deschide orice.
+// Allowlist-ul e in lib/net.js (functie pura, testata).
 ipcMain.handle("open-external", (_e, url) => {
-  if (typeof url === "string" && EXTERNAL_ALLOW.some((re) => re.test(url))) shell.openExternal(url);
+  if (libNet.isExternalAllowed(url)) shell.openExternal(url);
+  else log("open-external: refuzat", String(url).slice(0, 120));
 });
 
 // pagina itemului pe poe.ninja (volum, istoric de preț):
@@ -1323,9 +1530,7 @@ const CATEGORY_SLUGS = { Currency: "currency", Runes: "runes", UncutGems: "uncut
 // "Jeweller's Orb" -> "jewellers-orb": apostroful se scoate (NU devine cratima).
 // Verificat pe toti cei 277 de itemi din API (toate categoriile); slug-ul e
 // identic in orice liga, se schimba doar segmentul de liga din URL.
-function nameSlug(s) {
-  return String(s || "").toLowerCase().replace(/['\u2019]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
+function nameSlug(s) { return libText.nameSlug(s); }
 function poeNinjaItemUrl(league, category, name) {
   const ls = LEAGUE_SLUGS[league], cs = CATEGORY_SLUGS[category], ns = nameSlug(name);
   if (!ls || !cs || !ns) return null;
@@ -1339,19 +1544,36 @@ function openItemPage(r) {
   const raw = r ? (r.matchedName || r.name) : null;   // numele din API (nu textul OCR)
   const name = typeof raw === "string" && nameSlug(raw) ? raw : null;
   const url = category && name ? poeNinjaItemUrl(league, category, name) : null;
-  if (url && EXTERNAL_ALLOW.some((re) => re.test(url))) shell.openExternal(url);
+  if (url && libNet.isExternalAllowed(url)) shell.openExternal(url);
   return url;
 }
 // click pe un rand -> pagina itemului
 ipcMain.handle("open-item", (_e, r) => openItemPage(r));
 // buffer de debug: loguri + liniile OCR brute din ultimul scan
-ipcMain.handle("get-debug", () => ({
-  logs: logLines.slice(),
-  ocrLines: lastOcrLines.slice(),
-  league: config.league,
-  region: config.region,
-  pricesAt: priceCache.fetchedAt,
-}));
+// (audit P5): fereastra Debug cere doar liniile NOI de la ultima intrebare,
+// nu tot bufferul de 300 de linii la fiecare 1.5s.
+ipcMain.handle("get-debug", (_e, since) => {
+  const want = Number.isFinite(Number(since)) ? Number(since) : 0;
+  const oldest = logSeqs.length ? logSeqs[0] - 1 : logSeq;
+  let logs, full;
+  if (want > 0 && want <= logSeq && want >= oldest) {
+    const idx = logSeqs.findIndex((s) => s > want);
+    logs = idx === -1 ? [] : logLines.slice(idx);
+    full = false;
+  } else {
+    logs = logLines.slice();
+    full = true;
+  }
+  return {
+    logs,
+    full,
+    seq: logSeq,
+    ocrLines: lastOcrLines.slice(),
+    league: config.league,
+    region: config.region,
+    pricesAt: priceCache.fetchedAt,
+  };
+});
 // fereastra Debug (log OCR + starea app)
 ipcMain.handle("open-debug", () => {
   if (debugWin && !debugWin.isDestroyed()) { debugWin.focus(); return; }
@@ -1420,6 +1642,48 @@ function pushFontToOverlays() {
   if (overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send("app-font", config.font);
   if (runeOverlayWin && !runeOverlayWin.isDestroyed()) runeOverlayWin.webContents.send("app-font", config.font);
 }
+// limba UI: persistata + trimisa live la toate ferestrele (overlay-uri + debug)
+function pushLang() {
+  const targets = [overlayWin, runeOverlayWin, debugWin];
+  for (const w of targets) if (w && !w.isDestroyed()) w.webContents.send("app-lang", config.lang);
+}
+ipcMain.handle("set-lang", async (_e, l) => {
+  const code = String(l || "").toLowerCase();
+  if (code === "auto") {
+    // UI urmeaza limba clientului PoE2; fara config de joc ramane limba curenta
+    config.langAuto = true;
+    config.lang = detectClientLang() || (GAME_LANGS.includes(config.lang) ? config.lang : "en");
+  } else {
+    config.langAuto = false;
+    config.lang = /^[a-z]{2}(-[a-z]{2,4})?$/.test(code) ? code : "en";
+  }
+  saveConfig();
+  pushLang();
+  // "auto" pentru limba jocului urmeaza limba UI: recalculam si resetam cache-ul OCR
+  await refreshGameLang();
+  lastScanHash = null;
+  // numele deja scanate se traduc imediat (nu asteptam urmatorul scan)
+  relocalizeRows();
+  if (lastRows.length) broadcast({ rows: lastRows, at: Date.now(), pricesAt: priceCache.fetchedAt });
+  return { ok: true, lang: config.lang, auto: config.langAuto };
+});
+// limba jocului pentru numele citite de OCR (auto / en / de / fr / es / pt / ru / ja / ko / th)
+ipcMain.handle("set-game-lang", async (_e, l) => {
+  const code = String(l || "auto").toLowerCase();
+  config.gameLang = code === "auto" || GAME_LANGS.includes(code) ? code : "auto";
+  saveConfig();
+  await refreshGameLang();
+  lastScanHash = null;   // altfel scanul cached (aceeasi imagine) nu reface OCR-ul in noua limba
+  let ocr = true;
+  if (gameLang !== "en") {
+    try {
+      const h = await checkOcrHealth();
+      const langs = (h && Array.isArray(h.langs) ? h.langs : []).map((t) => String(t).toLowerCase());
+      ocr = langs.some((t) => t.slice(0, 2) === gameLang);
+    } catch { ocr = true; }
+  }
+  return { ok: true, gameLang: config.gameLang, active: gameLang, ocr };
+});
 ipcMain.handle("set-font", (_e, f) => {
   const id = String(f || "");
   const known = ["georgia", "segoe", "cambria", "consolas", "verdana", "tahoma", "trebuchet", "times", "courier", "arial", "norse"];
@@ -1498,12 +1762,22 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 if (isSingleInstance) app.whenReady().then(() => {
+  // curatenie %TEMP%: PNG-uri lasate in urma de un crash (audit E3)
+  sweepTempFiles();
   // overlay-urile NU pornesc automat la lansare: la fiecare start incep OPRITE
   // (si salvam starea), ca sa nu apara peste joc fara sa fie cerute explicit.
   config.overlay = false;
   config.runeOverlay = false;
+  // UI "auto": porneste direct in limba clientului de joc (configul PoE2)
+  if (config.langAuto) {
+    const c = detectClientLang();
+    if (c) { config.lang = c; log("client: limba UI din configul jocului =", c); }
+  }
   saveConfig();
   createWindow();
+  // limba jocului (numele localizate + motorul OCR) trebuie rezolvata INAINTE de
+  // primul scan: altfel overlay-ul compara nume germane cu preturi englezesti.
+  refreshGameLang().catch(() => {});
   // pornim scanarea + overlay-urile IMEDIAT (fara sa asteptam preturile), ca
   // aplicatia sa se simta deschisa din prima; preturile se incarca in background
   if (config.region) startPoll();
@@ -1526,6 +1800,7 @@ if (isSingleInstance) app.whenReady().then(() => {
 });
 // la inchidere: opresc polling-ul si OMOR procesul PowerShell OCR (cald) ca sa nu ramana orfan
 app.on("will-quit", () => {
+  try { flushLog(); } catch {}
   try { stopPoll(); } catch {}
   try { if (ocrProc && !ocrProc.killed) ocrProc.kill(); } catch {}
   try { stopFgProc(); } catch {}
@@ -1533,12 +1808,33 @@ app.on("will-quit", () => {
 app.on("window-all-closed", () => app.quit());
 
 // prinde erorile nemanagite ca sa vedem exact unde e bug-ul
-process.on("uncaughtException", (e) => {
-  log("UNCAUGHT EXCEPTION:", e && e.stack ? e.stack : String(e));
-});
-process.on("unhandledRejection", (e) => {
-  log("UNHANDLED REJECTION:", e && e.stack ? e.stack : String(e));
-});
+// (audit S6): inainte erau doar logate si aplicatia continua in stare necunoscuta.
+// Acum aratam un dialog cu optiune de repornire - utilizatorul nu ramane blocat.
+let fatalShown = false;
+function reportFatal(kind, err) {
+  flushLog();
+  log(kind + ":", err && err.stack ? err.stack : String(err));
+  if (fatalShown) return;
+  fatalShown = true;
+  try {
+    if (!app.isReady()) return;
+    dialog.showMessageBox({
+      type: "error",
+      buttons: ["Restart", "Quit"],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      title: "Path of Expedition",
+      message: "The app hit an unexpected error.",
+      detail: String((err && err.message) ? err.message : err),
+    }).then(({ response }) => {
+      if (response === 0) { app.relaunch(); app.exit(0); }
+      else app.exit(1);
+    }).catch(() => {});
+  } catch {}
+}
+process.on("uncaughtException", (e) => reportFatal("UNCAUGHT EXCEPTION", e));
+process.on("unhandledRejection", (e) => reportFatal("UNHANDLED REJECTION", e));
 // crash-uri de sub-proces (renderer/GPU/utility) -> in log, ca sa vedem freeze-uri/crash-uri
 app.on("child-process-gone", (_e, d) => {
   log("CHILD PROCESS GONE:", (d && d.type) || "?", "reason=" + ((d && d.reason) || "?"), "exitCode=" + ((d && d.exitCode) ?? "?"));

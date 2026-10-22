@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
 />
 <style>
   html,body { margin:0; height:100%; background:rgba(34,197,94,0.12); border:2px dashed #22c55e; overflow:hidden; }
@@ -22,26 +22,10 @@
 </style>
 </head>
 <body>
-<div class="dragbar">Drag me over the panel · resize from corners · Enter = save</div>
-<div class="tip">Enter = save region · Esc = cancel</div>
-<script>
-window.addEventListener("error", (e) => {
-  // logueaza erorile in consola principalului
-  console.error("SELECT ERROR:", e.message, "at", e.filename, e.lineno);
-});
-window.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    const region = {
-      x: window.screenX,
-      y: window.screenY,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
-    window.api.sendRegion(region);
-    window.close();
-  }
-  if (e.key === "Escape") window.close();
-});
-</script>
+<div class="dragbar" data-i18n="select.drag">Drag me over the panel · resize from corners · Enter = save</div>
+<div class="tip" data-i18n="select.tip">Enter = save region · Esc = cancel</div>
+<script src="locales.js"></script>
+<script src="i18n.js"></script>
+<script src="select.js"></script>
 </body>
 </html>

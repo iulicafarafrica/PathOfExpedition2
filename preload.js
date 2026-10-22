@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld("api", {
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   openItem: (row) => ipcRenderer.invoke("open-item", row),
   openDebug: () => ipcRenderer.invoke("open-debug"),
-  getDebug: () => ipcRenderer.invoke("get-debug"),
+  getDebug: (since) => ipcRenderer.invoke("get-debug", since),
   checkOcr: () => ipcRenderer.invoke("check-ocr"),
   checkUpdate: () => ipcRenderer.invoke("check-update"),
   doUpdate: () => ipcRenderer.invoke("do-update"),
@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("api", {
   setHideNames: (on) => ipcRenderer.invoke("set-hide-names", on),
   setMinValue: (v) => ipcRenderer.invoke("set-min-value", v),
   setFont: (f) => ipcRenderer.invoke("set-font", f),
+  setLang: (l) => ipcRenderer.invoke("set-lang", l),
+  setGameLang: (l) => ipcRenderer.invoke("set-game-lang", l),
   selectRegion: () => ipcRenderer.invoke("select-region"),
   refreshPrices: () => ipcRenderer.invoke("refresh-prices"),
   // Rune Planner
@@ -26,8 +28,11 @@ contextBridge.exposeInMainWorld("api", {
   toggleRuneOverlay: (on) => ipcRenderer.invoke("toggle-rune-overlay", on),
   onScan: (cb) => ipcRenderer.on("scan", (_e, data) => cb(data)),
   onAlert: (cb) => ipcRenderer.on("alert", (_e, data) => cb(data)),
+  // avertismente din main proces (ex. fereastra blocata) - audit S6
+  onNotice: (cb) => ipcRenderer.on("app-notice", (_e, data) => cb(data)),
   onOverlayState: (cb) => ipcRenderer.on("overlay-state", (_e, on) => cb(on)),
   onRuneOverlayState: (cb) => ipcRenderer.on("rune-overlay-state", (_e, on) => cb(on)),
   onFont: (cb) => ipcRenderer.on("app-font", (_e, f) => cb(f)),
+  onLang: (cb) => ipcRenderer.on("app-lang", (_e, l) => cb(l)),
   sendRegion: (region) => ipcRenderer.send("region-selected", region),
 });

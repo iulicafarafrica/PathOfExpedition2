@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
 />
 <title>Debug — Path of Expedition</title>
 <style>
@@ -30,45 +30,21 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Debug</h1>
-  <div id="meta" class="meta">Loading…</div>
+  <h1 data-i18n="debug.title">Debug</h1>
+  <div id="meta" class="meta" data-i18n="debug.loading">Loading…</div>
   <div class="cols">
     <div class="col">
-      <h2>Raw OCR (last scan)</h2>
-      <div id="ocr" class="box ocr"><span class="empty">No lines yet.</span></div>
+      <h2 data-i18n="debug.ocrCol">Raw OCR (last scan)</h2>
+      <div id="ocr" class="box ocr"><span class="empty" data-i18n="debug.noLines">No lines yet.</span></div>
     </div>
     <div class="col">
-      <h2>App log</h2>
-      <div id="logs" class="box logs"><span class="empty">No logs.</span></div>
+      <h2 data-i18n="debug.logCol">App log</h2>
+      <div id="logs" class="box logs"><span class="empty" data-i18n="debug.noLogs">No logs.</span></div>
     </div>
   </div>
 </div>
-<script>
-const metaEl = document.getElementById("meta");
-const ocrEl = document.getElementById("ocr");
-const logsEl = document.getElementById("logs");
-
-function esc(s) {
-  return String(s).replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
-}
-
-async function refresh() {
-  const d = await window.api.getDebug();
-  const pricesAgo = d.pricesAt ? Math.round((Date.now() - d.pricesAt) / 1000) + "s ago" : "never";
-  metaEl.innerHTML =
-    `League: <b>${esc(d.league || "?")}</b> &nbsp;|&nbsp; Region: <b>${d.region ? "set" : "not set"}</b> &nbsp;|&nbsp; Prices: <b>${pricesAgo}</b>`;
-
-  ocrEl.innerHTML = d.ocrLines.length
-    ? d.ocrLines.map((t, i) => `${i + 1}. ${esc(t)}`).join("\n")
-    : '<span class="empty">No OCR lines (scan not started yet?).</span>';
-
-  logsEl.innerHTML = d.logs.length
-    ? d.logs.slice().reverse().map(esc).join("\n")
-    : '<span class="empty">No logs.</span>';
-}
-
-refresh();
-setInterval(refresh, 1500);
-</script>
+<script src="locales.js"></script>
+<script src="i18n.js"></script>
+<script src="debug.js"></script>
 </body>
 </html>
