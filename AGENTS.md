@@ -81,6 +81,10 @@ Use them instead of improvising the steps.
     string goes into **all 10** `renderer/locales.js` blocks — the test enforces parity.
 22. The Guide tab content is community-sourced and **credited**: u/Sidnv (Reddit guide)
     and Jestra1229 (Expedition Cheatsheet). Keep the credits when editing it.
+    **The tab is currently DISABLED** (`GUIDE_ENABLED = false` in `main.js`) until written
+    permission to use that material arrives. Do not re-enable it, and do not ship the
+    guide in release notes, without the user's go-ahead. The content stays in
+    `renderer/guide.js` so it can be switched back on with one flag.
 23. Prices/loot data comes from poe.ninja and the official trade API — cite the source
     in comments and README.
 

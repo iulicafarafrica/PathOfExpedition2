@@ -534,6 +534,13 @@ const GITHUB_API_LATEST = `https://api.github.com/repos/${GITHUB_REPO}/releases/
 // altfel suntem o instalare facuta cu Setup-ul.
 const IS_PORTABLE = !!(process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR);
 
+// Guide tab: DEZACTIVAT pana cand primim confirmarea scrisa ca putem folosi
+// materialul (tipsurile din ghidul lui u/Sidnv + tabelele lui Jestra1229).
+// Continutul ramane in repo (renderer/guide.js) - doar UI-ul e ascuns.
+// Cand ai confirmatia: schimba in true, reconstruieste si repune creditele
+// (deja sunt in continut si in release notes).
+const GUIDE_ENABLED = false;
+
 function parseVer(v) {
   return String(v || "").replace(/^v/i, "").split(".").map((n) => parseInt(n, 10) || 0);
 }
@@ -1428,7 +1435,7 @@ function notifyRuneOverlayState() {
 }
 
 // ---------- IPC ----------
-ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale, portable: IS_PORTABLE }));
+ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale, portable: IS_PORTABLE, guideEnabled: GUIDE_ENABLED }));
 // ---------- Rune Planner (baza de date + reverse-lookup) ----------
 // Datele (data/runes.json + data/recipes.json) se incarca o singura data.
 planner.loadData();

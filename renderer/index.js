@@ -124,9 +124,17 @@ leagueEl.onchange = async () => {
 };
 
 let hasRegion = false;
+let guideEnabled = false;
 async function boot() {
   const cfg = await window.api.getConfig();
   const leagues = cfg.availableLeagues || [];
+  // Guide tab: ascuns daca e dezactivat in main (flag GUIDE_ENABLED)
+  guideEnabled = !!cfg.guideEnabled;
+  const guideBtn = document.getElementById("tabBtnGuide");
+  if (guideBtn) guideBtn.style.display = guideEnabled ? "" : "none";
+  if (!guideEnabled && document.getElementById("tab-guide")) {
+    document.getElementById("tab-guide").hidden = true;
+  }
   leagueEl.innerHTML = leagues.map(l => `<option value="${l}">${l}</option>`).join("");
   leagueEl.value = cfg.league || leagues[0] || "";
   setPricesTime(cfg.pricesAt, cfg.pricesStale);
@@ -339,7 +347,7 @@ function showTab(which) {
 document.getElementById("tabBtnPrices").onclick = () => showTab("prices");
 document.getElementById("tabBtnPlanner").onclick = () => showTab("planner");
 document.getElementById("tabBtnCombos").onclick = () => showTab("combos");
-document.getElementById("tabBtnGuide").onclick = () => showTab("guide");
+document.getElementById("tabBtnGuide").onclick = () => { if (guideEnabled) showTab("guide"); };
 
 // ---------- Rune Planner ----------
 let plannerRunes = [];
@@ -553,7 +561,8 @@ function relang() {
   setOvlBtn(overlayOn); setSndBtn(soundOn); setNmBtn(namesOn);
   setPricesTime(lastPricesAt, lastPricesStale);
   render(curRows, null);
-  renderChips(); renderChase(); updatePlan(); renderCombos(); renderGuide();
+  renderChips(); renderChase(); updatePlan(); renderCombos();
+  if (guideEnabled) renderGuide();
   statusEl.textContent = T(hasRegion ? "status.regionSet" : "status.chooseRegion");
   checkUpdateNow(true);
 }
