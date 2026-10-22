@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    name: Test (Node ${{ matrix.os }})
+    name: Preflight (Node ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -17,10 +17,15 @@ jobs:
         os: [windows-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # istoricul complet: verificarea tag-urilor are nevoie de commit-uri
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - name: Install dependencies
         run: npm ci
-      - name: Run tests
-        run: npm test
+      - name: Preflight (tests + invariants)
+        run: npm run preflight
+        env:
+          CI: "true"

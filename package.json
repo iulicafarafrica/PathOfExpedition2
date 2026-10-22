@@ -8,6 +8,9 @@
   "scripts": {
     "start": "electron .",
     "test": "node test/run.js",
+    "preflight": "node scripts/preflight.js",
+    "preflight:release": "node scripts/preflight.js --release",
+    "predist": "node scripts/preflight.js",
     "dist": "electron-builder",
     "build-names": "node tools/build-names.js"
   },

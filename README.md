@@ -282,11 +282,13 @@ No telemetry, no analytics, no other endpoints. Settings live in one `config.jso
 git clone https://github.com/iulicafarafrica/PathOfExpedition2
 cd PathOfExpedition2
 npm install
-npm test          # 60 regression tests, no dependencies needed
-npm run dist
+npm run preflight   # tests + project invariants (the gate)
+npm run dist        # runs the gate again, then builds
 ```
 
 Executables land in `dist/`. `package-lock.json` pins dependencies, so a fresh clone builds the same thing.
+
+`AGENTS.md` holds the rules for AI-assisted work on this repo (and the `.opencode/` commands `/preflight`, `/release`, `/audit`).
 
 **Development commands:**
 
@@ -294,6 +296,7 @@ Executables land in `dist/`. `package-lock.json` pins dependencies, so a fresh c
 | --- | --- |
 | `npm start` | Runs the app from source (no packaging). |
 | `npm test` | Regression tests (`test/run.js`) - parser, planner, name matching, locales, guide and the main-process helpers in `lib/`. Runs in CI on every push. |
+| `npm run preflight` | The quality gate: tests plus every project invariant (strict CSP, URL allowlist, updater integrity, packaging, release discipline). Runs automatically before every build. |
 | `npm run build-names` | Regenerates `data/names/*.json` and `data/names/rev-*.json` from the official PoE2 trade static data (needs network). |
 | `npm run dist` | Builds the portable `.exe` and the NSIS installer into `dist/`. |
 
