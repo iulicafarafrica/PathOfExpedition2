@@ -278,6 +278,21 @@ if (!NO_TESTS) {
     results.push(["info", "release-guard", m[1] + " teste trecute"]);
     return true;
   });
+
+  check("flux de update (Setup pentru instalat, portable pentru portable)", () => {
+    let out = "";
+    try {
+      out = sh(process.execPath, [path.join("scripts", "test-update-flow.js")]);
+    } catch (e) {
+      const msg = (e.stdout || "") + (e.stderr || "");
+      return { detail: "testele de update au esuat:\n" + msg.slice(-900) };
+    }
+    const m = out.match(/(\d+) trecute, (\d+) esuate/);
+    if (!m) return { detail: "output neasteptat de la testele de update" };
+    if (Number(m[2]) > 0) return { detail: m[2] + " teste de update au esuat" };
+    results.push(["info", "flux de update", m[1] + " teste trecute"]);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -584,6 +584,7 @@ async function checkUpdate() {
         // sha256-ul asset-ului (GitHub il expune ca "digest": "sha256:...") pt verificare
         sha256: String(a.digest || "").replace(/^sha256:/i, "").toLowerCase() || null,
       }));
+    const chosen = pickAsset(assets);
     return {
       ok: true,
       current: cur,
@@ -591,6 +592,10 @@ async function checkUpdate() {
       updateAvailable: isNewerVer(latest, cur),
       releaseUrl: j.html_url,
       assets,
+      // ce s-ar descarca la "Update now": tipul instalarii decide intre
+      // Setup (instalat) si exe-ul portable (portable)
+      mode: IS_PORTABLE ? "portable" : "installer",
+      assetName: chosen ? chosen.name : null,
     };
   } catch (e) {
     return { ok: false, error: String(e) };
@@ -604,30 +609,19 @@ function pickAsset(assets) {
   return libUpdate.pickAsset(assets, IS_PORTABLE);
 }
 
+// Executia update-ului: descarcare + verificare integritate + pornire.
+// Implementarea e in lib/update.js (functie testabila, cu dependinte injectate).
 async function doUpdate(asset) {
-  if (!asset || !asset.url) throw new Error("No asset to download");
-  const dest = path.join(os.tmpdir(), asset.name.replace(/[^\w.\- ]+/g, "_"));
-  const r = await fetch(asset.url, { headers: { "User-Agent": NINJA_UA } });
-  if (!r.ok) throw new Error(`Download failed (HTTP ${r.status})`);
-  const buf = Buffer.from(await r.arrayBuffer());
-  // INTEGRITATE (audit S2): host + dimensiune + sha256 - OBLIGATORIU.
-  // Daca release-ul nu are digest, NU pornim binarul (nu mai exista "skip" implicit).
-  const v = libUpdate.verifyAsset(asset, buf);
-  log(`update: sha256 ok (${v.sha256})`);
-  fs.writeFileSync(dest, buf);
-  log(`update: downloaded ${asset.name} (${buf.length} bytes) -> ${dest}`);
-  if (IS_PORTABLE) {
-    // o singura instanta: daca am lansa acum noua copie, ar fi redirectionata catre
-    // cea veche si ar iesi. Deci pornim noul exe DUPA ce iesim noi (relaunch).
-    app.relaunch({ execPath: dest, args: [] });
-    log("update: restarting into", dest);
-    setTimeout(() => { try { app.quit(); } catch { app.exit(0); } }, 800);
-    return { ok: true, dest, name: asset.name, mode: "portable", restarting: true };
-  }
-  // instalare cu Setup: installer-ul cere singur inchiderea aplicatiei, apoi o reporneste
-  const launchErr = await shell.openPath(dest); // porneste noul exe / installerul
-  if (launchErr) throw new Error(launchErr);
-  return { ok: true, dest, name: asset.name, mode: "installer" };
+  return libUpdate.performUpdate(asset, {
+    isPortable: IS_PORTABLE,
+    fetchImpl: (url, init) => fetch(url, init),
+    writeFile: (p, buf) => fs.writeFileSync(p, buf),
+    openPath: (p) => shell.openPath(p),
+    relaunch: (o) => app.relaunch(o),
+    quit: () => { try { app.quit(); } catch { app.exit(0); } },
+    destDir: os.tmpdir(),
+    log,
+  });
 }
 
 // ---------- prețuri PoE Ninja ----------
@@ -1434,7 +1428,7 @@ function notifyRuneOverlayState() {
 }
 
 // ---------- IPC ----------
-ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale }));
+ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale, portable: IS_PORTABLE }));
 // ---------- Rune Planner (baza de date + reverse-lookup) ----------
 // Datele (data/runes.json + data/recipes.json) se incarca o singura data.
 planner.loadData();

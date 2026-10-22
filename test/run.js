@@ -6,8 +6,20 @@ const planner = require("../planner");
 
 let passed = 0, failed = 0;
 const failures = [];
+const pending = [];
 function t(name, fn) {
-  try { fn(); passed++; }
+  try {
+    const r = fn();
+    // testele pot fi asincrone (functii care returneaza o promisiune)
+    if (r && typeof r.then === "function") {
+      pending.push(r.then(
+        () => { passed++; },
+        (e) => { failed++; failures.push({ name, err: (e && e.message) ? e.message : String(e) }); }
+      ));
+    } else {
+      passed++;
+    }
+  }
   catch (e) { failed++; failures.push({ name, err: (e && e.message) ? e.message : String(e) }); }
 }
 
@@ -453,9 +465,64 @@ t("net.isExternalAllowed: orice altceput e refuzat", () => {
   assert.ok(!libNet.isExternalAllowed(null));
 });
 
+t("update.performUpdate: instalat -> descarca Setup-ul si porneste installerul", () => {
+  const buf = Buffer.from("setup");
+  const asset = { name: "Setup.exe", url: "https://github.com/x/y/a.exe", size: buf.length, sha256: libUpdate.sha256Hex(buf) };
+  const calls = { openPath: [], relaunch: [] };
+  return libUpdate.performUpdate(asset, {
+    isPortable: false,
+    fetchImpl: async () => ({ ok: true, status: 200, arrayBuffer: async () => buf }),
+    writeFile: () => {},
+    openPath: async (p) => { calls.openPath.push(p); return ""; },
+    relaunch: (o) => calls.relaunch.push(o),
+    quit: () => {},
+    destDir: ".",
+  }).then((r) => {
+    assert.strictEqual(r.mode, "installer");
+    assert.strictEqual(calls.openPath.length, 1);
+    assert.strictEqual(calls.relaunch.length, 0);
+  });
+});
+t("update.performUpdate: portable -> descarca exe-ul portable si se relanseaza in el", () => {
+  const buf = Buffer.from("portable");
+  const asset = { name: "App.exe", url: "https://github.com/x/y/a.exe", size: buf.length, sha256: libUpdate.sha256Hex(buf) };
+  const calls = { openPath: [], relaunch: [] };
+  return libUpdate.performUpdate(asset, {
+    isPortable: true,
+    fetchImpl: async () => ({ ok: true, status: 200, arrayBuffer: async () => buf }),
+    writeFile: () => {},
+    openPath: async (p) => { calls.openPath.push(p); return ""; },
+    relaunch: (o) => calls.relaunch.push(o),
+    quit: () => {},
+    destDir: ".",
+    quitDelayMs: 0,
+  }).then((r) => {
+    assert.strictEqual(r.mode, "portable");
+    assert.strictEqual(calls.relaunch.length, 1);
+    assert.strictEqual(calls.openPath.length, 0);
+  });
+});
+t("update.performUpdate: sha256 gresit -> nu porneste nimic", () => {
+  const buf = Buffer.from("x");
+  const asset = { name: "App.exe", url: "https://github.com/x/y/a.exe", size: buf.length, sha256: "0".repeat(64) };
+  const calls = { openPath: [], relaunch: [] };
+  return libUpdate.performUpdate(asset, {
+    isPortable: true,
+    fetchImpl: async () => ({ ok: true, status: 200, arrayBuffer: async () => buf }),
+    writeFile: () => {},
+    openPath: async (p) => { calls.openPath.push(p); return ""; },
+    relaunch: (o) => calls.relaunch.push(o),
+    quit: () => {},
+    destDir: ".",
+  }).then(() => { throw new Error("ar fi trebuit sa arunce"); },
+    (e) => { assert.ok(/SHA-256 mismatch/.test(e.message)); assert.strictEqual(calls.relaunch.length, 0); });
+});
+
 // ---------- report ----------
-console.log(`\n[test] ${passed} trecute, ${failed} esuate`);
-if (failed) {
-  for (const f of failures) console.log(`  FAIL: ${f.name}: ${f.err}`);
-  process.exit(1);
-}
+Promise.all(pending).then(() => {
+  console.log(`\n[test] ${passed} trecute, ${failed} esuate`);
+  if (failed) {
+    for (const f of failures) console.log(`  FAIL: ${f.name}: ${f.err}`);
+    process.exit(1);
+  }
+});
