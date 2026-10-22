@@ -274,6 +274,8 @@ The whole app is in this repo, [MIT licensed](LICENSE), with no hidden part. The
 
 No telemetry, no analytics, no other endpoints. Settings live in one `config.json` under `%APPDATA%\path-of-expedition`. Locally it also reads `poe2_production_Config.ini` from your PoE2 documents folder, only to detect the game language.
 
+**A note on release tags:** versions **1.1.14 - 1.1.17** were published from a working tree that was never committed, so the `v1.1.17` tag GitHub created automatically pointed at the 1.1.13 commit. That source is not recoverable, so the tag now points at the **1.1.18** commit, which contains every 1.1.17 feature plus the audit fixes - the published 1.1.17 binaries are unchanged. **1.1.18 is the first release whose tag matches its source exactly.**
+
 **Build it yourself** (Windows, Node 18+):
 
 ```bash
