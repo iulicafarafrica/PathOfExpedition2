@@ -263,6 +263,21 @@ if (!NO_TESTS) {
     results.push(["info", "suite de regresie", m[1] + " teste trecute"]);
     return true;
   });
+
+  check("release-guard (pluginul care blocheaza push-urile de tag gresite)", () => {
+    let out = "";
+    try {
+      out = sh(process.execPath, [path.join("scripts", "test-release-guard.js")]);
+    } catch (e) {
+      const msg = (e.stdout || "") + (e.stderr || "");
+      return { detail: "testele release-guard au esuat:\n" + msg.slice(-900) };
+    }
+    const m = out.match(/(\d+) trecute, (\d+) esuate/);
+    if (!m) return { detail: "output neasteptat de la testele release-guard" };
+    if (Number(m[2]) > 0) return { detail: m[2] + " teste release-guard au esuat" };
+    results.push(["info", "release-guard", m[1] + " teste trecute"]);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------

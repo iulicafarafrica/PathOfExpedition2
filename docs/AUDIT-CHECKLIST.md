@@ -15,6 +15,7 @@ invariant nobody checks is a comment, not a rule.
 | --- | --- | --- |
 | Version in `package.json` is the released version | `npm run preflight` | automated |
 | Tag `v<version>` exists **and points at the published source commit** | `git rev-list -n 1 v<version>` vs `HEAD` | automated |
+| A **new** tag's source actually contains that version | `release-guard` plugin (`.opencode/plugin/`) | automated for AI-assisted pushes |
 | Working tree clean before building | `git status --porcelain` | automated (warning) |
 | No local artifacts in the repo | `git ls-files` vs README usage | automated (`.gitignore`) |
 | No secrets committed | pattern scan over tracked files | automated |

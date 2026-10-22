@@ -41,6 +41,10 @@ Use them instead of improvising the steps.
 4. Bump `package.json` version first; the tag must match it (the gate checks this).
 5. Never commit local artifacts (screenshots, `.ahk`, `.ps1` helpers). `.gitignore` lists
    them — add to it if a new one appears.
+6. **A plugin enforces #2 for AI-assisted work:** `.opencode/plugin/release-guard.js`
+   blocks any `git push` of a tag whose source does not contain that version (and
+   warns when the tag points to a newer source). Pushes of branches are untouched.
+   If it blocks you, the tag is wrong — fix the tag/commit, don't work around it.
 
 ### Security
 6. `script-src` in every renderer is exactly `'self'`. **No `'unsafe-inline'` for scripts.**
@@ -110,11 +114,13 @@ planner.js         runes → 322 Runeshape recipes
 names.js           localized item names (OCR language ↔ English)
 data/              runes, recipes, name maps (offline databases)
 scripts/preflight.js  the gate
+scripts/test-release-guard.js  tests for the tag-push guard
 test/run.js        regression tests
 tools/build-names.js regenerates data/names
 AGENTS.md          these rules (loaded automatically in every session)
 docs/AUDIT-CHECKLIST.md  the audit checklist
 .opencode/command/ /preflight, /release, /audit
+.opencode/plugin/release-guard.js  blocks pushing a tag that doesn't match the source
 ```
 
 ## Details
