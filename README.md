@@ -92,6 +92,7 @@ Your region and league are saved. If you move the game window, re-select the reg
 | **Rune overlay** | A second overlay beside the rune panel that auto-detects runes per row. See [Rune overlay](#rune-overlay). |
 | **Screenshots & recording** | The overlay is capturable: Snipping Tool, Print Screen, OBS. |
 | **League switch** | Change league in-app and the current panel is re-priced instantly. |
+| **Expedition Guide** | A built-in handbook (strategy, Jado passives, Logbooks, risk/reward) plus the community loot-tier tables, in all 10 languages and fully offline. See [Expedition Guide](#expedition-guide). |
 
 ### Languages
 
@@ -197,6 +198,23 @@ Like the price overlay, it needs **borderless windowed** mode and free space to 
 
 ---
 
+## Expedition Guide
+
+The **Guide tab** is a built-in handbook for the Expedition system - what to bring, how the loop works, how Remnants propagate, which Jado passives to take, how Logbooks and Grand Expeditions fit together, and what the risk/reward actually looks like. It ships in all 10 UI languages and works completely offline.
+
+It also includes the community loot tables - **Rumour / Map / Mods** tiers from S to D, the unique map list, the boss maps and the saga list - so you can check a drop against the known tiers without leaving the app.
+
+**Credits** - the guide content is built on top of community work:
+
+| Source | What it provided |
+| --- | --- |
+| [**u/Sidnv**](https://www.reddit.com/r/pathofexile2builds/comments/1uhtpix/guide_to_expedition_in_055/) (r/pathofexile2builds) | *Guide to Expedition in 0.5.5* - the basis for the strategy sections and the "more tips" (hidden rumours, map rumours vs boss rumours, gold-bordered runes, Expedition-region maps). |
+| [**Jestra1229**](https://docs.google.com/spreadsheets/d/16YU8mSS7TdLPdmOunVjiPn_NrKVGfcnMkuMQDy8jgZA) | *Expedition Cheatsheet* - the source of the Rumour / Map / Mods / Rating tables (S+ → D). |
+
+Links open in your normal browser from inside the app.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -224,8 +242,8 @@ No Tesseract, no Python, no downloaded model. The app uses **Windows' own OCR en
 
 Per scan:
 
-1. **Capture**: Electron's `desktopCapturer` grabs the screen at native resolution, crops your region (DPI-corrected) and writes a temp PNG.
-2. **Recognize**: a bundled PowerShell script (`ocr.ps1`) loads the PNG and runs `OcrEngine.RecognizeAsync` with the **game's language** (detected from the PoE2 client config, or picked in **Game language**). If that engine isn't installed it falls back to **English**, then your Windows profile languages. It returns each line's text and position as JSON.
+1. **Capture**: Electron's `desktopCapturer` grabs the screen at native resolution, crops your region (DPI-corrected, with a native GPU crop) and writes a temp PNG.
+2. **Recognize**: a PowerShell script (embedded in the app and written to `%TEMP%` as `xpc-ocr-*.ps1`) loads the PNG and runs `OcrEngine.RecognizeAsync` with the **game's language** (detected from the PoE2 client config, or picked in **Game language**). If that engine isn't installed it falls back to **English**, then your Windows profile languages. It returns each line's text and position as JSON.
 3. **Parse**: the main process groups lines into reward rows (name + `Nx`), filters noise and matches against the price cache.
 
 Everything runs locally. No screenshot or text ever leaves your machine.
@@ -262,10 +280,20 @@ No telemetry, no analytics, no other endpoints. Settings live in one `config.jso
 git clone https://github.com/iulicafarafrica/PathOfExpedition2
 cd PathOfExpedition2
 npm install
+npm test          # 60 regression tests, no dependencies needed
 npm run dist
 ```
 
 Executables land in `dist/`. `package-lock.json` pins dependencies, so a fresh clone builds the same thing.
+
+**Development commands:**
+
+| Command | What it does |
+| --- | --- |
+| `npm start` | Runs the app from source (no packaging). |
+| `npm test` | Regression tests (`test/run.js`) - parser, planner, name matching, locales, guide and the main-process helpers in `lib/`. Runs in CI on every push. |
+| `npm run build-names` | Regenerates `data/names/*.json` and `data/names/rev-*.json` from the official PoE2 trade static data (needs network). |
+| `npm run dist` | Builds the portable `.exe` and the NSIS installer into `dist/`. |
 
 **VirusTotal (current build):** [view scan](https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==). New releases get a new hash, so feel free to re-scan.
 
@@ -299,7 +327,9 @@ Code signing for releases is in progress and will remove most of these flags.
 
 - **Electron**: Node.js main process (capture, OCR, prices, overlay, IPC), `contextIsolation` + sandboxed renderer, no remote code, navigation locked down
 - **electron-builder**: portable `.exe` and NSIS installer (x64)
-- **Vanilla HTML/CSS/JS** UI: three screens (main window, price overlay, rune overlay), no framework
+- **Vanilla HTML/CSS/JS** UI: five screens (main window, price overlay, rune overlay, region picker, debug), no framework
+- **No runtime dependencies**: the shipped app is Electron + this repo's own code - no third-party packages at runtime
+- **Strict CSP**: `script-src 'self'` in every renderer (no `unsafe-inline`), all external links behind a host allowlist
 - **Rune detection**: pure image template matching (33 bundled rune sprites), no OCR
 - **Bundled database**: `data/runes.json` (33 runes) + `data/recipes.json` (322 combinations, patch 0.5.5), loaded once, fully offline
 - **Localized names**: `data/names/<lang>.json` (official trade names, localized → English) and `data/names/rev-<lang>.json` (English → localized, for display), generated from the official trade static data; the game language is read from `poe2_production_Config.ini`, so no manual setup
