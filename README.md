@@ -92,7 +92,6 @@ Your region and league are saved. If you move the game window, re-select the reg
 | **Rune overlay** | A second overlay beside the rune panel that auto-detects runes per row. See [Rune overlay](#rune-overlay). |
 | **Screenshots & recording** | The overlay is capturable: Snipping Tool, Print Screen, OBS. |
 | **League switch** | Change league in-app and the current panel is re-priced instantly. |
-| **Expedition Guide** | A built-in handbook (strategy, Jado passives, Logbooks, risk/reward) plus the community loot-tier tables, in all 10 languages and fully offline. See [Expedition Guide](#expedition-guide). |
 
 ### Languages
 
@@ -117,13 +116,23 @@ Your region and league are saved. If you move the game window, re-select the reg
 | **Noise filter** | Chat lines and panel noise without an `Nx` quantity get dropped. |
 | **Multi-monitor & DPI** | Binds capture to the right display. 125% / 150% scaling is fine. |
 
+### Performance
+
+| | |
+| --- | --- |
+| **Native region crop** | The screen region is cropped by the graphics stack instead of pixel-by-pixel in JavaScript - about **2.9x faster** per scan, with plenty of headroom on 4K. |
+| **Memoised prices** | The Rune Planner resolves ~**50x fewer** prices per click (results are cached instead of recomputed for every recipe). |
+| **Async logging** | The log is written in the background, so the window never waits on the disk. |
+| **Change detection** | The region is only re-read and re-recognised when the pixels actually changed. |
+
 ### Reliability
 
 | | |
 | --- | --- |
 | **Offline cache** | If poe.ninja or your network is down, it keeps running on the last snapshot (marked "cached, offline") and recovers on its own. |
 | **Auto-refresh** | Prices reload every 30 min. **Refresh prices** forces it. |
-| **Update check** | Checks GitHub Releases on launch and every 30 min. **Update now** downloads and launches it, SHA-256 verified. |
+| **Update check** | Checks GitHub Releases on launch and every 30 min. **Update now** downloads and launches it - and it picks the file that matches your install: a portable build updates with the portable build, an installed copy with the installer. The download is **SHA-256 + size verified** and is refused if it doesn't match. |
+| **Self-healing** | An unexpected error offers **Restart / Quit** instead of failing silently, and a frozen window is reloaded automatically. |
 | **Check OCR & Debug window** | Verify the OCR engine and see the raw OCR lines and app log when something reads wrong. |
 
 ---
@@ -195,23 +204,6 @@ For every row it shows:
 - **Chase progress**: a gold line like *"→ Mirror of Kalandra 3/9"*
 
 Like the price overlay, it needs **borderless windowed** mode and free space to the right of the region. A short legend shows for the first 20 seconds, and your region and on/off state are remembered.
-
----
-
-## Expedition Guide
-
-The **Guide tab** is a built-in handbook for the Expedition system - what to bring, how the loop works, how Remnants propagate, which Jado passives to take, how Logbooks and Grand Expeditions fit together, and what the risk/reward actually looks like. It ships in all 10 UI languages and works completely offline.
-
-It also includes the community loot tables - **Rumour / Map / Mods** tiers from S to D, the unique map list, the boss maps and the saga list - so you can check a drop against the known tiers without leaving the app.
-
-**Credits** - the guide content is built on top of community work:
-
-| Source | What it provided |
-| --- | --- |
-| [**u/Sidnv**](https://www.reddit.com/r/pathofexile2builds/comments/1uhtpix/guide_to_expedition_in_055/) (r/pathofexile2builds) | *Guide to Expedition in 0.5.5* - the basis for the strategy sections and the "more tips" (hidden rumours, map rumours vs boss rumours, gold-bordered runes, Expedition-region maps). |
-| [**Jestra1229**](https://docs.google.com/spreadsheets/d/16YU8mSS7TdLPdmOunVjiPn_NrKVGfcnMkuMQDy8jgZA) | *Expedition Cheatsheet* - the source of the Rumour / Map / Mods / Rating tables (S+ → D). |
-
-Links open in your normal browser from inside the app.
 
 ---
 
@@ -295,12 +287,12 @@ Executables land in `dist/`. `package-lock.json` pins dependencies, so a fresh c
 | Command | What it does |
 | --- | --- |
 | `npm start` | Runs the app from source (no packaging). |
-| `npm test` | Regression tests (`test/run.js`) - parser, planner, name matching, locales, guide and the main-process helpers in `lib/`. Runs in CI on every push. |
+| `npm test` | Regression tests (`test/run.js`) - parser, planner, name matching, locales and the main-process helpers in `lib/`. Runs in CI on every push. |
 | `npm run preflight` | The quality gate: tests plus every project invariant (strict CSP, URL allowlist, updater integrity, packaging, release discipline). Runs automatically before every build. |
 | `npm run build-names` | Regenerates `data/names/*.json` and `data/names/rev-*.json` from the official PoE2 trade static data (needs network). |
 | `npm run dist` | Builds the portable `.exe` and the NSIS installer into `dist/`. |
 
-**VirusTotal (current build):** [view scan](https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==). New releases get a new hash, so feel free to re-scan.
+**VirusTotal (scan of an earlier build):** [view scan](https://www.virustotal.com/gui/file-analysis/ZDdjNmU3ZDU1YWIxYWQ0NDI1Mjc4NGFlMmU5MDJlNjY6MTc5MjI1ODY3NQ==). Every release has a new hash, so feel free to re-scan the file you downloaded.
 
 <details>
 <summary><b>"My antivirus flagged it" — what's going on?</b></summary>
@@ -335,15 +327,17 @@ Code signing for releases is in progress and will remove most of these flags.
 - **Vanilla HTML/CSS/JS** UI: five screens (main window, price overlay, rune overlay, region picker, debug), no framework
 - **No runtime dependencies**: the shipped app is Electron + this repo's own code - no third-party packages at runtime
 - **Strict CSP**: `script-src 'self'` in every renderer (no `unsafe-inline`), all external links behind a host allowlist
+- **Performance**: native GPU crop for the screen region, memoised price lookups, cached name maps, buffered async logging
+- **Quality**: the main-process logic lives in small pure modules (`lib/`) covered by **66 regression tests**, plus a pre-build gate that refuses to package if an invariant breaks - all running in CI on every push
 - **Rune detection**: pure image template matching (33 bundled rune sprites), no OCR
 - **Bundled database**: `data/runes.json` (33 runes) + `data/recipes.json` (322 combinations, patch 0.5.5), loaded once, fully offline
 - **Localized names**: `data/names/<lang>.json` (official trade names, localized → English) and `data/names/rev-<lang>.json` (English → localized, for display), generated from the official trade static data; the game language is read from `poe2_production_Config.ini`, so no manual setup
 - **WinRT OCR via PowerShell**: `Windows.Media.Ocr`, `Windows.Graphics.Imaging`, one warm process that restarts with the matching engine when the language changes
 - **Web Audio API** for the alert chime, generated in code
 - **poe.ninja** exchange API (`/poe2/api/economy/exchange/current/overview`) and image CDN
-- **GitHub Releases API** for updates (SHA-256 verified)
+- **GitHub Releases API** for updates (SHA-256 + size verified, refused if they don't match)
 
-Dev: `npm run dev` runs it unpackaged, `npm run dist` builds both executables into `dist/`.
+Dev: `npm start` runs it unpackaged, `npm run preflight` runs the gate, `npm run dist` builds both executables into `dist/`.
 
 </details>
 
