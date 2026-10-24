@@ -19,6 +19,12 @@ Price your Expedition drops while you run. Plan your Runeshape combos. Never alt
 
 ---
 
+## My other tools for Path of Exile
+
+- **[Chat Alert](https://github.com/iulicafarafrica/Poe2ChatAlert)** — Real-time PoE2 chat alerts: leech words, trade items, price drops, Discord/ntfy push notifications.
+
+---
+
 ## What is this?
 
 A small Windows app that **reads the Expedition reward panel from your screen** and tells you what those drops are worth, using live prices from poe.ninja. It shows them right over the game in a click-through overlay, or in a compact window.
