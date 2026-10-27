@@ -40,12 +40,6 @@ Real-time PoE2 chat alerts: leech words, trade items, price drops, Discord/ntfy 
 
 ---
 
-## My other tools for Path of Exile
-
-- **[Chat Alert](https://github.com/iulicafarafrica/Poe2ChatAlert)** — Real-time PoE2 chat alerts: leech words, trade items, price drops, Discord/ntfy push notifications.
-
----
-
 ## What is this?
 
 A small Windows app that **reads the Expedition reward panel from your screen** and tells you what those drops are worth, using live prices from poe.ninja. It shows them right over the game in a click-through overlay, or in a compact window.
@@ -275,7 +269,7 @@ npm run dist        # runs the gate again, then builds
 
 Executables land in `dist/`. `package-lock.json` pins dependencies, so a fresh clone builds the same thing.
 
-`AGENTS.md` holds the rules for AI-assisted work on this repo (and the `.opencode/` commands `/preflight`, `/release`, `/audit`).
+`AGENTS.md` holds the rules for AI-assisted work on this repo.
 
 **Development commands:**
 

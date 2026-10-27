@@ -14,17 +14,13 @@ anything, and never work around a failing check — fix the cause.**
 | Command | What it does |
 | --- | --- |
 | `npm start` | Run from source. |
-| `npm test` | 63 regression tests (`test/run.js`), no dependencies needed. |
+| `npm test` | 67 regression tests (`test/run.js`), no dependencies needed. |
 | `npm run preflight` | **The gate.** Tests + all invariants (security, packaging, release discipline). Run before you claim anything is done. |
 | `npm run preflight:release` | Strict mode — also requires a clean tree and a tag matching the version. Run before publishing. |
 | `npm run dist` | Builds portable + installer. Runs `predist` → the gate runs automatically; a failing check stops the build. |
 | `npm run build-names` | Regenerates `data/names/*.json` from the official trade API (network). |
 
 `npm run preflight -- --fast` skips the network audit. Never skip the rest.
-
-**Slash commands (this project):** `/preflight` (run the gate and fix it),
-`/release` (the full release ritual), `/audit` (security/performance/robustness review).
-Use them instead of improvising the steps.
 
 ---
 
@@ -41,10 +37,8 @@ Use them instead of improvising the steps.
 4. Bump `package.json` version first; the tag must match it (the gate checks this).
 5. Never commit local artifacts (screenshots, `.ahk`, `.ps1` helpers). `.gitignore` lists
    them — add to it if a new one appears.
-6. **A plugin enforces #2 for AI-assisted work:** `.opencode/plugin/release-guard.js`
-   blocks any `git push` of a tag whose source does not contain that version (and
-   warns when the tag points to a newer source). Pushes of branches are untouched.
-   If it blocks you, the tag is wrong — fix the tag/commit, don't work around it.
+6. **Check the tag before you push it.** `npm run preflight` verifies that the release
+   tag matches `package.json`; run it after tagging. Never move or reuse a published tag.
 
 ### Security
 6. `script-src` in every renderer is exactly `'self'`. **No `'unsafe-inline'` for scripts.**
@@ -118,13 +112,10 @@ planner.js         runes → 322 Runeshape recipes
 names.js           localized item names (OCR language ↔ English)
 data/              runes, recipes, name maps (offline databases)
 scripts/preflight.js  the gate
-scripts/test-release-guard.js  tests for the tag-push guard
 test/run.js        regression tests
 tools/build-names.js regenerates data/names
 AGENTS.md          these rules (loaded automatically in every session)
 docs/AUDIT-CHECKLIST.md  the audit checklist
-.opencode/command/ /preflight, /release, /audit
-.opencode/plugin/release-guard.js  blocks pushing a tag that doesn't match the source
 ```
 
 ## Details
