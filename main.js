@@ -14,6 +14,12 @@ const libUpdate = require("./lib/update");
 const libNet = require("./lib/net");
 const { computeCropRect, intersect } = require("./lib/capture");
 
+// iconita din taskbar: in dev electron.exe are iconita Electron daca fereastra nu are
+// una explicita; in build-ul impachetat e iconita din build/.aceeasi imagine, copiata
+// in renderer/img ca sa fie sigur inclusa in asar (build/ e doar buildResources).
+const APP_ICON = path.join(__dirname, "renderer", "img", "app-icon.ico");
+if (process.platform === "win32") app.setAppUserModelId("com.iulianicb.pathofexpedition");
+
 // alertele sonore pornesc fara gest de utilizator (altfel AudioContext-ul din renderer e blocat)
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
@@ -1042,6 +1048,7 @@ function createWindow() {
     minWidth: 600,
     minHeight: 480,
     title: "Path of Expedition",
+    icon: APP_ICON,
     backgroundColor: "#111827",
     show: false,   // apare doar dupa primul render (fara flash alb la pornire)
     webPreferences: {
@@ -1366,6 +1373,7 @@ function toggleOverlay(on) {
     frame: false, transparent: true, resizable: false, movable: false,
     focusable: false, skipTaskbar: true, hasShadow: false, show: false,
     alwaysOnTop: true,
+    icon: APP_ICON,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
   overlayWin.setAlwaysOnTop(true, "screen-saver");   // peste joc (borderless)
@@ -1416,6 +1424,7 @@ function toggleRuneOverlay(on) {
     frame: false, transparent: true, resizable: false, movable: false,
     focusable: false, skipTaskbar: true, hasShadow: false, show: false,
     alwaysOnTop: true,
+    icon: APP_ICON,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
   runeOverlayWin.setAlwaysOnTop(true, "screen-saver");
@@ -1580,7 +1589,8 @@ ipcMain.handle("open-debug", () => {
   if (debugWin && !debugWin.isDestroyed()) { debugWin.focus(); return; }
   debugWin = new BrowserWindow({
     width: 720, height: 520,
-    title: "Debug — Path of Expedition",
+    title: "Debug - Path of Expedition",
+    icon: APP_ICON,
     backgroundColor: "#111827",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
@@ -1706,6 +1716,7 @@ function selectRegionFlow(kind) {
     frame: false,
     resizable: true,
     alwaysOnTop: true,
+    icon: APP_ICON,
     backgroundColor: "#111827ee",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true },
   });
