@@ -5,6 +5,8 @@ window.I18N_LOCALES = {
   en: {
     "tab.guide": "Guide",
     "lang.name": "English",
+    "prices.min": "Min.",
+    "prices.minTitle": "Show only items worth at least the selected amount",
     "tab.other": "Other tools",
     "other.heading": "My other tools for Path of Exile",
     "other.sub": "More tools I built for Path of Exile 2.",
@@ -182,6 +184,8 @@ window.I18N_LOCALES = {
   nl: {
     "tab.guide": "Gids",
     "lang.name": "Nederlands",
+    "prices.min": "Min.",
+    "prices.minTitle": "Toon alleen items die minstens de gekozen waarde waard zijn",
     "tab.other": "Andere tools",
     "other.heading": "Mijn andere tools voor Path of Exile",
     "other.sub": "Meer tools die ik voor Path of Exile 2 heb gemaakt.",
@@ -359,6 +363,8 @@ window.I18N_LOCALES = {
   de: {
     "tab.guide": "Leitfaden",
     "lang.name": "Deutsch",
+    "prices.min": "Min.",
+    "prices.minTitle": "Nur Items anzeigen, die mindestens den gewählten Wert haben",
     "tab.other": "Weitere Tools",
     "other.heading": "Meine weiteren Tools für Path of Exile",
     "other.sub": "Weitere Tools, die ich für Path of Exile 2 gebaut habe.",
@@ -536,6 +542,8 @@ window.I18N_LOCALES = {
   fr: {
     "tab.guide": "Guide",
     "lang.name": "Français",
+    "prices.min": "Min.",
+    "prices.minTitle": "Afficher uniquement les objets valant au moins le montant choisi",
     "tab.other": "Autres outils",
     "other.heading": "Mes autres outils pour Path of Exile",
     "other.sub": "D'autres outils que j'ai créés pour Path of Exile 2.",
@@ -713,6 +721,8 @@ window.I18N_LOCALES = {
   es: {
     "tab.guide": "Guía",
     "lang.name": "Español",
+    "prices.min": "Mín.",
+    "prices.minTitle": "Mostrar solo objetos que valgan al menos la cantidad elegida",
     "tab.other": "Otras herramientas",
     "other.heading": "Mis otras herramientas para Path of Exile",
     "other.sub": "Más herramientas que he creado para Path of Exile 2.",
@@ -890,6 +900,8 @@ window.I18N_LOCALES = {
   pt: {
     "tab.guide": "Guia",
     "lang.name": "Português (BR)",
+    "prices.min": "Mín.",
+    "prices.minTitle": "Mostrar apenas itens que valham pelo menos o valor escolhido",
     "tab.other": "Outras ferramentas",
     "other.heading": "Minhas outras ferramentas para Path of Exile",
     "other.sub": "Mais ferramentas que criei para Path of Exile 2.",
@@ -1067,6 +1079,8 @@ window.I18N_LOCALES = {
   ru: {
     "tab.guide": "Гайд",
     "lang.name": "Русский",
+    "prices.min": "Мин.",
+    "prices.minTitle": "Показывать только предметы стоимостью не ниже выбранной",
     "tab.other": "Другие инструменты",
     "other.heading": "Мои другие инструменты для Path of Exile",
     "other.sub": "Ещё инструменты, которые я сделал для Path of Exile 2.",
@@ -1244,6 +1258,8 @@ window.I18N_LOCALES = {
   ja: {
     "tab.guide": "ガイド",
     "lang.name": "日本語",
+    "prices.min": "最小",
+    "prices.minTitle": "選択した価値以上のアイテムのみ表示します",
     "tab.other": "その他のツール",
     "other.heading": "Path of Exile 用のその他のツール",
     "other.sub": "Path of Exile 2 向けに作ったその他のツールです。",
@@ -1421,6 +1437,8 @@ window.I18N_LOCALES = {
   ko: {
     "tab.guide": "가이드",
     "lang.name": "한국어",
+    "prices.min": "최소",
+    "prices.minTitle": "선택한 가치 이상의 아이템만 표시합니다",
     "tab.other": "기타 도구",
     "other.heading": "Path of Exile용 기타 도구",
     "other.sub": "Path of Exile 2를 위해 만든 다른 도구입니다.",
@@ -1598,6 +1616,8 @@ window.I18N_LOCALES = {
   th: {
     "tab.guide": "คู่มือ",
     "lang.name": "ไทย",
+    "prices.min": "ขั้นต่ำ",
+    "prices.minTitle": "แสดงเฉพาะไอเทมที่มีมูลค่าอย่างน้อยตามที่เลือก",
     "tab.other": "เครื่องมืออื่น ๆ",
     "other.heading": "เครื่องมืออื่น ๆ ของฉันสำหรับ Path of Exile",
     "other.sub": "เครื่องมือเพิ่มเติมที่ฉันสร้างสำหรับ Path of Exile 2",

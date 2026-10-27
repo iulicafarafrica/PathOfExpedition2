@@ -8,6 +8,7 @@ const ovlBtn = document.getElementById("ovl");
 const sndBtn = document.getElementById("snd");
 const nmBtn = document.getElementById("nm");
 const minvalEl = document.getElementById("minval");
+const minOnEl = document.getElementById("minOn");
 let overlayOn = false;
 let soundOn = false;
 let namesOn = true;   // numele itemului in overlay (false = ascuns)
@@ -142,7 +143,10 @@ async function boot() {
   setSndBtn(!!cfg.soundAlert);
   setNmBtn(!cfg.hideNames);
   minDiv = cfg.minDivine || 0;
-  minvalEl.value = String(minDiv);
+  minOnEl.checked = minDiv > 0;
+  const wanted = String(minDiv);
+  const known = [...minvalEl.options].some((o) => o.value === wanted);
+  minvalEl.value = known && minDiv > 0 ? wanted : "1";
   fontSel.value = cfg.font || FontUI.DEFAULT;
   gameLangSel.value = cfg.gameLang || "auto";
   langAuto = !!cfg.langAuto;
@@ -185,11 +189,20 @@ nmBtn.onclick = async () => {
     statusEl.textContent = T(r.hideNames ? "status.namesHidden" : "status.namesShown");
   }
 };
-minvalEl.onchange = async () => {
-  const r = await window.api.setMinValue(parseFloat(minvalEl.value) || 0);
+// prag minim: checkbox-ul e on/off, select-ul alege valoarea (in Divine)
+async function applyMin(v) {
+  const r = await window.api.setMinValue(v);
   if (r && r.ok) minDiv = r.minDivine || 0;
+  minOnEl.checked = minDiv > 0;
   render(curRows, null);   // aplica pragul imediat, fara re-scan
   statusEl.textContent = minDiv > 0 ? T("status.hidingBelow", { n: minDiv }) : T("status.showingAll");
+}
+minOnEl.onchange = () => {
+  applyMin(minOnEl.checked ? (parseFloat(minvalEl.value) || 1) : 0);
+};
+minvalEl.onchange = () => {
+  minOnEl.checked = true;   // alegerea unei valori porneste filtrul automat
+  applyMin(parseFloat(minvalEl.value) || 1);
 };
 
 // ---------- Options (meniu dropdown: limba + font + actiuni utilitare) ----------

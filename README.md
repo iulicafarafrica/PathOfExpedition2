@@ -94,7 +94,7 @@ Your region and league are saved. If you move the game window, re-select the reg
 | **Market movers** | Items up 15%+ over 7 days get highlighted. |
 | **Auto currency** | Cheap items in exalted, expensive in divine, same rounding as the poe.ninja site. |
 | **Item icons & links** | Real item icons on every row. Click a row to open its poe.ninja page (volume, history). |
-| **Hide filter** | Hide drops below Off / ≥0.01 / ≥0.1 / ≥1 / ≥10 Divine to keep busy runs clean. |
+| **Min filter** | Tick the box and pick a threshold (≥0.01 / ≥0.1 / ≥1 / ≥10 Divine) to show only drops worth that much. Untick it to see everything. |
 | **Sound alert** | A chime when an item worth **1 Divine+** drops, once per new item. Toggle with **Alert**. |
 
 ### In-game experience

@@ -44,6 +44,7 @@
   }
   .btns { display:flex; gap:3px; flex-wrap:wrap; justify-content:center; align-items:center; }
   .corelbl { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:bold; }
+  .corelbl input[type="checkbox"] { width:14px; height:14px; margin:0; accent-color:var(--gold); cursor:pointer; }
   .btns button, .btns select { padding:3px 7px; font-size:11px; }
   #minval { width:72px; }
   button, select {
@@ -316,12 +317,13 @@
     <label class="corelbl"><span data-i18n="prices.league">League:</span>
       <select id="league"></select>
     </label>
-    <label class="corelbl"><span data-i18n="prices.hide">Hide:</span>
+    <label class="corelbl" data-i18n-title="prices.minTitle" title="Show only items worth at least the selected amount">
+      <input type="checkbox" id="minOn">
+      <span data-i18n="prices.min">Min.</span>
       <select id="minval">
-        <option value="0" data-i18n="prices.hideOff">Off</option>
         <option value="0.01">≥0.01 div</option>
         <option value="0.1">≥0.1 div</option>
-        <option value="1">≥1 div</option>
+        <option value="1" selected>≥1 div</option>
         <option value="10">≥10 div</option>
       </select>
     </label>
