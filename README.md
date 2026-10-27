@@ -38,6 +38,10 @@ Price your Expedition drops while you run. Plan your Runeshape combos. Never alt
 
 Real-time PoE2 chat alerts: leech words, trade items, price drops, Discord/ntfy push notifications.
 
+### [Poe2 Trade Watcher](https://chromewebstore.google.com/detail/poe2-trade-watcher/cijhdepfikmgngilainmcokgblkbbdkp)
+
+Save PoE2 trade items, track prices, build collections, and get Discord or ntfy alerts.
+
 ---
 
 ## What is this?
