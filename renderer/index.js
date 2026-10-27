@@ -338,7 +338,7 @@ window.api.onNotice((d) => {
 
 // ---------- tabs ----------
 function showTab(which) {
-  const ids = { prices: "tab-prices", planner: "tab-planner", combos: "tab-combos", guide: "tab-guide" };
+  const ids = { prices: "tab-prices", planner: "tab-planner", combos: "tab-combos", guide: "tab-guide", other: "tab-other" };
   for (const k of Object.keys(ids)) {
     document.getElementById(ids[k]).hidden = k !== which;
     document.getElementById("tabBtn" + k[0].toUpperCase() + k.slice(1)).classList.toggle("active", k === which);
@@ -348,6 +348,11 @@ document.getElementById("tabBtnPrices").onclick = () => showTab("prices");
 document.getElementById("tabBtnPlanner").onclick = () => showTab("planner");
 document.getElementById("tabBtnCombos").onclick = () => showTab("combos");
 document.getElementById("tabBtnGuide").onclick = () => { if (guideEnabled) showTab("guide"); };
+document.getElementById("tabBtnOther").onclick = () => showTab("other");
+// linkurile din Other tools trec prin allowlist-ul din lib/net.js (main process)
+document.querySelectorAll("#tab-other a[data-ext]").forEach((a) => {
+  a.onclick = (e) => { e.preventDefault(); window.api.openExternal(a.getAttribute("href")); };
+});
 
 // ---------- Rune Planner ----------
 let plannerRunes = [];

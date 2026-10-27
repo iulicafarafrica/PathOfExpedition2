@@ -11,11 +11,32 @@ Price your Expedition drops while you run. Plan your Runeshape combos. Never alt
 [![License](https://img.shields.io/badge/License-MIT-2ea043?style=for-the-badge)](LICENSE)
 [![Prices](https://img.shields.io/badge/Prices-poe.ninja-8b5cf6?style=for-the-badge)](https://poe.ninja)
 
-![In-game overlay](tycUOSf.jpeg)
-
-*Live poe.ninja prices drawn straight over your Runeshape panel.*
-
 </div>
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="tycUOSf.jpeg" alt="In-game price overlay"><br><em>Live poe.ninja prices drawn straight over your Runeshape panel.</em></td>
+<td width="50%"><img src="CKQshjl.png" alt="The app window"><br><em>Prefer a normal window? Same price list, with icons, value tiers and a running total.</em></td>
+</tr>
+<tr>
+<td width="50%"><img src="screenshot-rune-planner.png" alt="Rune Planner tab"><br><em>Pick your runes and see the exact recipe, what it can extend to and the jackpots to chase.</em></td>
+<td width="50%"><img src="screenshot-all-combos.png" alt="All Combos tab"><br><em>All 322 combinations with category, danger level and live price.</em></td>
+</tr>
+<tr>
+<td width="50%"><img src="screenshot-rune-overlay.jpeg" alt="Rune overlay in game"><br><em>The rune overlay next to the Runeshape panel: danger, reward, spread advice and chase progress for every row.</em></td>
+<td width="50%"></td>
+</tr>
+</table>
+
+---
+
+## My other tools for Path of Exile
+
+### [Poe2ChatAlert](https://github.com/iulicafarafrica/Poe2ChatAlert)
+
+Real-time PoE2 chat alerts: leech words, trade items, price drops, Discord/ntfy push notifications.
 
 ---
 
@@ -36,14 +57,6 @@ It also ships with the full Runeshape rune database (**33 runes, 322 combination
 | Local & private | Zero input lag | Free & open source |
 | :---: | :---: | :---: |
 | OCR runs on your PC, nothing is uploaded | Click-through overlay, the game keeps your mouse | MIT licensed, read it or build it yourself |
-
-<div align="center">
-
-![The app window](CKQshjl.png)
-
-*Prefer a normal window? Same price list, with icons, value tiers and a running total.*
-
-</div>
 
 > [!NOTE]
 > This project is **not affiliated with, endorsed by, or sponsored by Grinding Gear Games** or poe.ninja. "Path of Exile" and "Path of Exile 2" belong to Grinding Gear Games. It is a fan-made tool, and GGG's ToS apply to everything you do in-game. Prices come from poe.ninja's public exchange API, the same one their website uses.
@@ -157,14 +170,6 @@ Turn **Overlay** on and prices are drawn over the game, lined up with each rewar
 
 The app bundles an offline database of **all 33 runes** (tier, monster danger, spread behavior) and **all 322 Runeshape combinations**.
 
-<div align="center">
-
-![Rune Planner tab](screenshot-rune-planner.png)
-
-*Pick your runes and see the exact recipe, what it can extend to, spread advice and the jackpots to chase.*
-
-</div>
-
 **Rune Planner tab.** Pick the runes you're looking at (click the chips, or **Read from screen** to detect them automatically):
 
 | Section | What you get |
@@ -180,27 +185,11 @@ The app bundles an offline database of **all 33 runes** (tier, monster danger, s
 
 Click a rune name in the planner to jump straight to its combinations.
 
-<div align="center">
-
-![All Combos tab](screenshot-all-combos.png)
-
-*All 322 combinations with category, danger level and live price.*
-
-</div>
-
 ---
 
 ## Rune overlay
 
 Box the rune panel once with **Set rune region**, then turn the overlay on. It's a separate click-through window (run it alongside the price overlay, on its own, or not at all) that sits right of the panel and **auto-detects the runes in each row** every couple of seconds, using image template matching. No OCR, no typing.
-
-<div align="center">
-
-![Rune overlay in game](screenshot-rune-overlay.jpeg)
-
-*The rune overlay next to the Runeshape panel: danger, reward, spread advice and chase progress for every row.*
-
-</div>
 
 For every row it shows:
 
