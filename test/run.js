@@ -450,7 +450,8 @@ t("net.isExternalAllowed: creditele din Guide sunt permise (audit S3)", () => {
   assert.ok(libNet.isExternalAllowed("https://docs.google.com/spreadsheets/d/16YU8mSS7TdLPdmOunVjiPn_NrKVGfcnMkuMQDy8jgZA"));
 });
 t("net.isExternalAllowed: linkurile din app raman permise", () => {
-  assert.ok(libNet.isExternalAllowed("https://buymeacoffee.com/iulian.icb"));
+  assert.ok(libNet.isExternalAllowed("https://ko-fi.com/nr5xdev"));
+  assert.ok(libNet.isExternalAllowed("https://ko-fi.com/nr5xdev/"));
   assert.ok(libNet.isExternalAllowed("https://github.com/iulicafarafrica/PathOfExpedition2/releases"));
   assert.ok(libNet.isExternalAllowed("https://poe.ninja/poe2/economy/forbiddenrites/currency/chaos-orb"));
 });
@@ -466,6 +467,8 @@ t("net.isExternalAllowed: orice altceput e refuzat", () => {
   assert.ok(!libNet.isExternalAllowed("https://nr5x.dev.evil.com/path-of-exile"));
   assert.ok(!libNet.isExternalAllowed("https://evil-nr5x.dev/path-of-exile"));
   assert.ok(!libNet.isExternalAllowed("http://nr5x.dev/path-of-exile"));  // fara https
+  assert.ok(!libNet.isExternalAllowed("https://buymeacoffee.com/iulian.icb"));  // link vechi
+  assert.ok(!libNet.isExternalAllowed("https://ko-fi.com/otherdev"));
   assert.ok(!libNet.isExternalAllowed("https://github.com/iulicafarafrica/PathOfExpedition2evil"));
   assert.ok(!libNet.isExternalAllowed("http://poe.ninja/poe2/economy/a/b/c"));  // fara https
   assert.ok(!libNet.isExternalAllowed("file:///C:/Windows/System32/calc.exe"));
@@ -625,6 +628,17 @@ t("overlaystyle.patch: pastreaza campurile neatinse", () => {
   assert.strictEqual(s.text, libOverlay.DEFAULTS.text);
 });
 
+// ---------- theme (doar UI) ----------
+const libTheme = require("../lib/theme");
+t("theme.normalize: temele cunoscute raman neschimbate", () => {
+  for (const id of libTheme.THEMES) assert.strictEqual(libTheme.normalize(id), id);
+});
+t("theme.normalize: orice valoare necunoscuta cade pe parchment", () => {
+  assert.strictEqual(libTheme.normalize("neon"), "parchment");
+  assert.strictEqual(libTheme.normalize(null), "parchment");
+  assert.strictEqual(libTheme.normalize(undefined), "parchment");
+});
+
 // ---------- ordinea de initializare in main.js ----------
 t("main.js: constantele folosite de loadConfig sunt declarate inainte de apel", () => {
   const fs = require("node:fs");
@@ -635,6 +649,13 @@ t("main.js: constantele folosite de loadConfig sunt declarate inainte de apel", 
   assert.ok(call > 0, "apelul loadConfig() trebuie sa existe");
   assert.ok(decl > 0, "ALERT_MIN_CHOICES trebuie declarat");
   assert.ok(decl < call, "ALERT_MIN_CHOICES trebuie declarat INAINTE de loadConfig() (altfel TDZ -> config resetat la fiecare pornire)");
+});
+t("main.js: interfata principala e scalata pentru lizibilitate", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const src = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf8");
+  assert.match(src, /const UI_ZOOM = 1\.[0-9]+;/);
+  assert.match(src, /setZoomFactor\(UI_ZOOM\)/);
 });
 
 // ---------- report ----------

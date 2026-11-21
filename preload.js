@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("api", {
   setOverlayStyle: (s, persist) => ipcRenderer.invoke("set-overlay-style", s, persist),
   resetSession: () => ipcRenderer.invoke("reset-session"),
   setFont: (f) => ipcRenderer.invoke("set-font", f),
+  setTheme: (t) => ipcRenderer.invoke("set-theme", t),
   setLang: (l) => ipcRenderer.invoke("set-lang", l),
   setGameLang: (l) => ipcRenderer.invoke("set-game-lang", l),
   selectRegion: () => ipcRenderer.invoke("select-region"),

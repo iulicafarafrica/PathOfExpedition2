@@ -204,6 +204,7 @@ async function boot() {
   langAuto = !!cfg.langAuto;
   langSel.value = langAuto ? "auto" : (cfg.lang || I18N.lang);
   FontUI.apply(fontSel.value);   // font salvat (aplicat si pe overlay-uri la pornire)
+  applyTheme(cfg.theme);         // tema doar pentru fereastra principala
   document.getElementById("ver").textContent = "v" + (cfg.version || "?");
   hasRegion = !!cfg.region;
   statusEl.textContent = T(hasRegion ? "status.regionSet" : "status.chooseRegion");
@@ -290,6 +291,7 @@ minChipsEl.querySelectorAll(".qchip").forEach((chip) => {
 const optBtn = document.getElementById("optBtn");
 const optMenu = document.getElementById("optMenu");
 const fontSel = document.getElementById("fontSel");
+const themeSel = document.getElementById("themeSel");
 const langSel = document.getElementById("langSel");
 const gameLangSel = document.getElementById("gameLangSel");
 const ovlOpacityEl = document.getElementById("ovlOpacity");
@@ -301,6 +303,13 @@ let langAuto = false;   // UI urmeaza limba clientului de joc
 // numele limbilor in limba lor (nu se traduc)
 const GAME_LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", es: "Español", pt: "Português (BR)", ru: "Русский", ja: "日本語", ko: "한국어", th: "ไทย" };
 fontSel.innerHTML = FontUI.TOKENS.map((t) => `<option value="${t.id}">${t.label}</option>`).join("");
+// tema UI: doar culorile ferestrei principale (overlay-ul si OCR-ul raman la fel)
+function applyTheme(id) {
+  const theme = ["parchment", "dark", "light"].includes(id) ? id : "parchment";
+  document.documentElement.dataset.theme = theme;
+  themeSel.value = theme;
+  return theme;
+}
 langSel.innerHTML = `<option value="auto">${esc(T("opt.langAuto"))}</option>` +
   I18N.list().map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("");
 gameLangSel.innerHTML = `<option value="auto">${esc(T("opt.gameLangAuto"))}</option>` +
@@ -320,6 +329,13 @@ document.addEventListener("click", () => closeOpt());
 fontSel.onchange = async () => {
   const r = await window.api.setFont(fontSel.value);
   if (r && r.ok) { FontUI.apply(r.font); statusEl.textContent = T("status.font", { font: FontUI.byId(r.font).label }); }
+};
+themeSel.onchange = async () => {
+  const r = await window.api.setTheme(themeSel.value);
+  if (r && r.ok) {
+    applyTheme(r.theme);
+    statusEl.textContent = T("status.theme", { name: themeSel.options[themeSel.selectedIndex].textContent });
+  }
 };
 // schimbarea limbii: o salvam in config; main o trimite live si la overlay-uri/debug
 langSel.onchange = async () => {
@@ -403,7 +419,7 @@ document.getElementById("optOcr").onclick = async () => {
   closeOpt();
 };
 document.getElementById("bmc").onclick = () => {
-  window.api.openExternal("https://buymeacoffee.com/iulian.icb");
+  window.api.openExternal("https://ko-fi.com/nr5xdev");
 };
 
 // ---------- update (GitHub Releases) ----------

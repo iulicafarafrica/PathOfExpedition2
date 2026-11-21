@@ -108,6 +108,7 @@ Your region and league are saved. If you move the game window, re-select the reg
 | --- | --- |
 | **Price overlay** | Prices aligned with each reward row, in a transparent click-through window. Toggle with **Overlay**. |
 | **Overlay style** | Tune the overlay from **⚙ → Overlay**: background opacity, text size, bar scale, text color and highlight color. Changes apply live. |
+| **UI themes** | **Parchment**, **Dark** or **Light** from **⚙ → Theme**, with a larger, more readable interface. Only the app window changes - the overlay and OCR stay untouched. |
 | **Rune overlay** | A second overlay beside the rune panel that auto-detects runes per row. See [Rune overlay](#rune-overlay). |
 | **Screenshots & recording** | The overlay is capturable: Snipping Tool, Print Screen, OBS. |
 | **League switch** | Change league in-app and the current panel is re-priced instantly. |
@@ -257,7 +258,7 @@ The whole app is in this repo, [MIT licensed](LICENSE), with no hidden part. The
 | `web.poecdn.com` | Item icons |
 | `api.github.com` | Release feed for the update check |
 | Release `.exe` URL | **Only** when you press "Update now" |
-| `buymeacoffee.com` | **Only** when you click the footer link |
+| `ko-fi.com` | **Only** when you click the footer link |
 
 No telemetry, no analytics, no other endpoints. Settings live in one `config.json` under `%APPDATA%\path-of-expedition`. Locally it also reads `poe2_production_Config.ini` from your PoE2 documents folder, only to detect the game language.
 
@@ -323,7 +324,7 @@ Code signing for releases is in progress and will remove most of these flags.
 - **No runtime dependencies**: the shipped app is Electron + this repo's own code - no third-party packages at runtime
 - **Strict CSP**: `script-src 'self'` in every renderer (no `unsafe-inline`), all external links behind a host allowlist
 - **Performance**: native GPU crop for the screen region, memoised price lookups, cached name maps, buffered async logging
-- **Quality**: the main-process logic lives in small pure modules (`lib/`) covered by **78 regression tests**, plus a pre-build gate that refuses to package if an invariant breaks - all running in CI on every push
+- **Quality**: the main-process logic lives in small pure modules (`lib/`) covered by **81 regression tests**, plus a pre-build gate that refuses to package if an invariant breaks - all running in CI on every push
 - **Rune detection**: pure image template matching (33 bundled rune sprites), no OCR
 - **Bundled database**: `data/runes.json` (33 runes) + `data/recipes.json` (322 combinations, patch 0.5.5), loaded once, fully offline
 - **Localized names**: `data/names/<lang>.json` (official trade names, localized → English) and `data/names/rev-<lang>.json` (English → localized, for display), generated from the official trade static data; the game language is read from `poe2_production_Config.ini`, so no manual setup
@@ -344,4 +345,4 @@ Got an idea, a bug or a feature request? [Open an issue](https://github.com/iuli
 
 If it saves you a headache (or a few exalted), a coffee is appreciated:
 
-[![Buy me a coffee](https://img.shields.io/badge/Support-Buy%20me%20a%20coffee-ffdd00?style=for-the-badge&logoColor=black)](https://buymeacoffee.com/iulian.icb)
+[![Buy me a coffee](https://img.shields.io/badge/Support-Buy%20me%20a%20coffee-ffdd00?style=for-the-badge&logoColor=black)](https://ko-fi.com/nr5xdev)

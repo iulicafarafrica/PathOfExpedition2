@@ -14,6 +14,7 @@ const libUpdate = require("./lib/update");
 const libNet = require("./lib/net");
 const libSession = require("./lib/session");
 const libOverlayStyle = require("./lib/overlaystyle");
+const libTheme = require("./lib/theme");
 const { computeCropRect, intersect } = require("./lib/capture");
 
 // iconita din taskbar: in dev electron.exe are iconita Electron daca fereastra nu are
@@ -94,9 +95,12 @@ function flushLog() {
 log("=== START ===");
 log("configPath:", path.join(app.getPath ? "(app not ready)" : "", "config.json"));
 
-// praguri oferite in UI pentru alerta sonora; declarat INAINTE de loadConfig(),
+// Pragurile oferite in UI pentru alerta sonora; declarat INAINTE de loadConfig(),
 // care il valideaza (altfel ReferenceError la pornire si configul s-ar reseta)
 const ALERT_MIN_CHOICES = [1, 5, 10, 20];
+// Scaleaza toata interfata principala (text, butoane, imagini) proportional.
+// Coordonatele OCR/overlay nu sunt afectate: ele vin din captura de ecran, nu din CSS.
+const UI_ZOOM = 1.3;
 let win = null;
 let debugWin = null;   // fereastra Debug (log OCR)
 let overlayWin = null;   // overlay-ul transparent peste panoul din joc
@@ -1017,7 +1021,8 @@ function configPath() {
 function loadConfig() {
   const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false,
     runeOverlay: false, soundAlert: false, alertMin: 1, minDivine: 0, hideNames: false, font: "segoe",
-    lang: "en", langAuto: true, gameLang: "auto", overlayStyle: libOverlayStyle.normalize({}) };
+    lang: "en", langAuto: true, gameLang: "auto", overlayStyle: libOverlayStyle.normalize({}),
+    theme: libTheme.DEFAULT };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
     log("loadConfig: read", raw.length, "chars");
@@ -1028,6 +1033,7 @@ function loadConfig() {
     // valori venite din config-uri vechi (sau editate manual) nu trebuie sa strice UI-ul
     cfg.alertMin = ALERT_MIN_CHOICES.includes(Number(cfg.alertMin)) ? Number(cfg.alertMin) : 1;
     cfg.overlayStyle = libOverlayStyle.normalize(cfg.overlayStyle);
+    cfg.theme = libTheme.normalize(cfg.theme);
     log("loadConfig: OK");
     return cfg;
   } catch (e) {
@@ -1103,6 +1109,11 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
+  // zoom dupa fiecare incarcare (Chromium reseteaza zoom-ul la reload/navigare)
+  win.webContents.setZoomFactor(UI_ZOOM);
+  win.webContents.on("did-finish-load", () => {
+    try { if (win && !win.isDestroyed()) win.webContents.setZoomFactor(UI_ZOOM); } catch {}
+  });
   win.once("ready-to-show", () => win.show());
   win.on("unresponsive", () => {
     // audit S6: nu doar in log - anuntam interfata, ca utilizatorul sa stie ce se intampla.
@@ -1571,7 +1582,7 @@ ipcMain.handle("do-update", async () => {
   }
 });
 // deschide un link extern in browserul implicit; doar URL-uri allowlist-uite
-// (buymeacoffee + release page + pagini de item poe.ninja + creditele din Guide),
+// (ko-fi + release page + pagini de item poe.ninja + creditele din Guide),
 // ca un renderer compromis sa nu poata deschide orice.
 // Allowlist-ul e in lib/net.js (functie pura, testata).
 ipcMain.handle("open-external", (_e, url) => {
@@ -1787,6 +1798,13 @@ ipcMain.handle("set-font", (_e, f) => {
   saveConfig();
   pushFontToOverlays();
   return { ok: true, font: config.font };
+});
+// tema UI: doar fereastra principala (overlay-ul si OCR-ul nu sunt afectate)
+ipcMain.handle("set-theme", (_e, id) => {
+  config.theme = libTheme.normalize(id);
+  saveConfig();
+  log("set-theme:", config.theme);
+  return { ok: true, theme: config.theme };
 });
 // flux comun de selectare region; kind = "scan" (regiunea de preturi) | "rune" (iconitele de rune)
 function selectRegionFlow(kind) {
