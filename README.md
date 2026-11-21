@@ -98,14 +98,16 @@ Your region and league are saved. If you move the game window, re-select the reg
 | **Market movers** | Items up 15%+ over 7 days get highlighted. |
 | **Auto currency** | Cheap items in exalted, expensive in divine, same rounding as the poe.ninja site. |
 | **Item icons & links** | Real item icons on every row. Click a row to open its poe.ninja page (volume, history). |
-| **Min filter** | Tick the box and pick a threshold (≥0.01 / ≥0.1 / ≥1 / ≥10 Divine) to show only drops worth that much. Untick it to see everything. |
-| **Sound alert** | A chime when an item worth **1 Divine+** drops, once per new item. Toggle with **Alert**. |
+| **Min filter** | Tick the box and pick a threshold (≥0.01 / ≥0.1 / ≥1 / ≥10 Divine), or use the **All / 1+ / 10+** quick chips. Untick it to see everything. |
+| **Session summary** | Running total in Divine, drop count, best drop and **Divine/hour** for the current run. **Reset run** saves it to a 10-run history. |
+| **Sound alert** | A chime when a new item at or above your threshold drops (**1 / 5 / 10 / 20 Divine**). Toggle with **Alert**; once per new item. |
 
 ### In-game experience
 
 | | |
 | --- | --- |
 | **Price overlay** | Prices aligned with each reward row, in a transparent click-through window. Toggle with **Overlay**. |
+| **Overlay style** | Tune the overlay from **⚙ → Overlay**: background opacity, text size, bar scale, text color and highlight color. Changes apply live. |
 | **Rune overlay** | A second overlay beside the rune panel that auto-detects runes per row. See [Rune overlay](#rune-overlay). |
 | **Screenshots & recording** | The overlay is capturable: Snipping Tool, Print Screen, OBS. |
 | **League switch** | Change league in-app and the current panel is re-priced instantly. |
@@ -321,7 +323,7 @@ Code signing for releases is in progress and will remove most of these flags.
 - **No runtime dependencies**: the shipped app is Electron + this repo's own code - no third-party packages at runtime
 - **Strict CSP**: `script-src 'self'` in every renderer (no `unsafe-inline`), all external links behind a host allowlist
 - **Performance**: native GPU crop for the screen region, memoised price lookups, cached name maps, buffered async logging
-- **Quality**: the main-process logic lives in small pure modules (`lib/`) covered by **66 regression tests**, plus a pre-build gate that refuses to package if an invariant breaks - all running in CI on every push
+- **Quality**: the main-process logic lives in small pure modules (`lib/`) covered by **77 regression tests**, plus a pre-build gate that refuses to package if an invariant breaks - all running in CI on every push
 - **Rune detection**: pure image template matching (33 bundled rune sprites), no OCR
 - **Bundled database**: `data/runes.json` (33 runes) + `data/recipes.json` (322 combinations, patch 0.5.5), loaded once, fully offline
 - **Localized names**: `data/names/<lang>.json` (official trade names, localized → English) and `data/names/rev-<lang>.json` (English → localized, for display), generated from the official trade static data; the game language is read from `poe2_production_Config.ini`, so no manual setup

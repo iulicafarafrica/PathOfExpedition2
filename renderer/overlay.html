@@ -22,20 +22,20 @@
      (width: max-content), ca sa acopere cat mai putin din joc. */
   .bar {
     position: absolute; left: 0;
-    display: flex; align-items: baseline; gap: 7px;
+    display: flex; align-items: baseline; gap: var(--bar-gap, 7px);
     width: max-content; max-width: calc(100% - 4px);
     font-family: var(--ui-font, "Segoe UI", Tahoma, sans-serif);
-    font-size: 14px; white-space: nowrap;
-    color: #ead9a8;
-    background: rgba(6, 5, 4, .96);
+    font-size: var(--bar-font, 14px); white-space: nowrap;
+    color: var(--bar-text, #ead9a8);
+    background: var(--bar-bg, rgba(6, 5, 4, .96));
     border: 1px solid rgba(214, 198, 156, .55);
     border-radius: 5px;
-    padding: 4px 10px;
+    padding: var(--bar-pad, 4px 10px);
     text-shadow: 0 1px 2px rgba(0, 0, 0, .95);
     box-shadow: 0 1px 5px rgba(0, 0, 0, .7);
   }
   .bar .name {
-    flex: 0 1 auto; min-width: 0; max-width: 190px;
+    flex: 0 1 auto; min-width: 0; max-width: calc(190px * var(--bar-scale, 1));
     overflow: hidden; text-overflow: ellipsis;
     font-weight: bold;
   }
@@ -44,14 +44,17 @@
   .bar .trend.down { color: #ff9090; }
   /* market mover: crestere mare pe 7 zile -> evidentiat, bun de vandut */
   .bar .trend.pump { color: #ffb347; font-weight: bold; }
-  .bar .price { flex-shrink: 0; color: #eddfb6; }
+  .bar .price { flex-shrink: 0; color: var(--bar-text, #eddfb6); }
   .bar .spark { flex-shrink: 0; }
-  .bar .ico { align-self: center; width: 18px; height: 18px; flex-shrink: 0; }
-  /* niveluri de valoare (praguri fixe in Divine) */
-  .bar.high .name, .bar.high .price { color: #86e592; }
-  .bar.high { border-color: rgba(134, 229, 146, .55); }
-  .bar.top .name, .bar.top .price { color: #ffd76a; }
-  .bar.top { border-color: rgba(240, 200, 90, .85); box-shadow: 0 0 7px rgba(240, 200, 90, .4); }
+  .bar .ico {
+    align-self: center; flex-shrink: 0;
+    width: calc(18px * var(--bar-scale, 1)); height: calc(18px * var(--bar-scale, 1));
+  }
+  /* niveluri de valoare (praguri fixe in Divine) - culoarea de accent e configurabila */
+  .bar.high .name, .bar.high .price { color: var(--bar-accent, #86e592); }
+  .bar.high { border-color: var(--bar-accent, rgba(134, 229, 146, .55)); }
+  .bar.top .name, .bar.top .price { color: var(--bar-accent, #ffd76a); }
+  .bar.top { border-color: var(--bar-accent, rgba(240, 200, 90, .85)); box-shadow: 0 0 7px var(--bar-accent, rgba(240, 200, 90, .4)); }
   .bar.unknown .price { color: #9a8760; }
   /* legenda (jos): ce inseamna sagetile si mini-graficul */
   #legend {

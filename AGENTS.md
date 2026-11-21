@@ -14,7 +14,7 @@ anything, and never work around a failing check — fix the cause.**
 | Command | What it does |
 | --- | --- |
 | `npm start` | Run from source. |
-| `npm test` | 67 regression tests (`test/run.js`), no dependencies needed. |
+| `npm test` | 77 regression tests (`test/run.js`), no dependencies needed. |
 | `npm run preflight` | **The gate.** Tests + all invariants (security, packaging, release discipline). Run before you claim anything is done. |
 | `npm run preflight:release` | Strict mode — also requires a clean tree and a tag matching the version. Run before publishing. |
 | `npm run dist` | Builds portable + installer. Runs `predist` → the gate runs automatically; a failing check stops the build. |

@@ -7,6 +7,24 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+// stilul ales in Options (main process l-a validat deja; aici doar il aplicam pe CSS)
+function applyStyle(s) {
+  const st = s || {};
+  const root = document.documentElement.style;
+  const scale = Number.isFinite(Number(st.scale)) ? Number(st.scale) : 1;
+  const fontSize = Number.isFinite(Number(st.fontSize)) ? Number(st.fontSize) : 14;
+  const opacity = Number.isFinite(Number(st.opacity)) ? Number(st.opacity) : 0.96;
+  root.setProperty("--bar-bg", `rgba(6,5,4,${opacity})`);
+  root.setProperty("--bar-font", fontSize + "px");
+  root.setProperty("--bar-scale", String(scale));
+  root.setProperty("--bar-gap", (7 * scale).toFixed(1) + "px");
+  root.setProperty("--bar-pad", (4 * scale).toFixed(1) + "px " + (10 * scale).toFixed(1) + "px");
+  root.setProperty("--bar-text", /^#[0-9a-f]{6}$/i.test(st.text || "") ? st.text : "#ead9a8");
+  root.setProperty("--bar-accent", /^#[0-9a-f]{6}$/i.test(st.accent || "") ? st.accent : "#86e592");
+}
+window.api.getConfig().then((c) => applyStyle(c && c.overlayStyle)).catch(() => {});
+window.api.onOverlayStyle((s) => applyStyle(s));
+
 // mini-grafic 7 zile din sparkline.data (se deseneaza direct: ultima valoare == totalChange)
 function sparkSvg(data, trend) {
   if (!Array.isArray(data) || data.length < 2) return "";

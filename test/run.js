@@ -525,6 +525,104 @@ t("update.performUpdate: sha256 gresit -> nu porneste nimic", () => {
     (e) => { assert.ok(/SHA-256 mismatch/.test(e.message)); assert.strictEqual(calls.relaunch.length, 0); });
 });
 
+// ---------- session (total pe run + istoric) ----------
+const libSession = require("../lib/session");
+t("session.addRows: numara doar itemele noi, nu si cele care raman pe ecran", () => {
+  let s = libSession.fresh(1000);
+  let r = libSession.addRows(s, [
+    { name: "Divine Orb", totalDivine: 1 },
+    { name: "Exalted Orb", totalDivine: 0.2 },
+  ], 2000);
+  assert.strictEqual(r.added, 2);
+  assert.ok(Math.abs(r.state.totalDivine - 1.2) < 1e-9);
+  assert.strictEqual(r.state.count, 2);
+  // acelasi scan nu mai adauga nimic
+  r = libSession.addRows(r.state, [
+    { name: "Divine Orb", totalDivine: 1 },
+    { name: "Exalted Orb", totalDivine: 0.2 },
+  ], 3000);
+  assert.strictEqual(r.added, 0);
+  assert.ok(Math.abs(r.state.totalDivine - 1.2) < 1e-9);
+  assert.strictEqual(r.state.count, 2);
+});
+t("session.addRows: item nou langa cele vechi + cel mai bun drop", () => {
+  let s = libSession.fresh(1000);
+  s = libSession.addRows(s, [{ name: "Exalted Orb", totalDivine: 0.2 }], 2000).state;
+  const r = libSession.addRows(s, [
+    { name: "Exalted Orb", totalDivine: 0.2 },
+    { name: "Perfect Exalted Orb", totalDivine: 30, displayName: "Perfect Exalted Orb" },
+  ], 3000);
+  assert.strictEqual(r.added, 1);
+  assert.strictEqual(r.state.count, 2);
+  assert.ok(Math.abs(r.state.totalDivine - 30.2) < 1e-9);
+  assert.strictEqual(r.state.best.name, "Perfect Exalted Orb");
+  assert.ok(Math.abs(r.state.best.value - 30) < 1e-9);
+});
+t("session.addRows: stack duplicat numara doar aparitiile suplimentare", () => {
+  let s = libSession.fresh(1000);
+  s = libSession.addRows(s, [{ name: "Regal Orb", totalDivine: 0.1 }], 2000).state;
+  const r = libSession.addRows(s, [
+    { name: "Regal Orb", totalDivine: 0.1 },
+    { name: "Regal Orb", totalDivine: 0.1 },
+  ], 3000);
+  assert.strictEqual(r.added, 1);
+  assert.strictEqual(r.state.count, 2);
+});
+t("session.summary: divine/ora cu prag de un minut", () => {
+  const s = { ...libSession.fresh(0), startedAt: 0, totalDivine: 2, count: 2 };
+  const sum = libSession.summary(s, 30000);   // 30s -> folosim 60s
+  assert.ok(Math.abs(sum.perHour - 120) < 1e-9);
+});
+t("session.reset: salveaza runul in istoric si porneste altul", () => {
+  let s = libSession.fresh(1000);
+  s = libSession.addRows(s, [{ name: "Divine Orb", totalDivine: 2 }], 2000).state;
+  const r = libSession.reset(s, 5000);
+  assert.strictEqual(r.run.count, 1);
+  assert.strictEqual(r.state.count, 0);
+  assert.strictEqual(r.state.totalDivine, 0);
+  assert.strictEqual(r.state.history.length, 1);
+  assert.strictEqual(r.state.history[0].count, 1);
+  assert.strictEqual(r.state.startedAt, 5000);
+});
+t("session.reset: istoricul pastreaza ultimele 10 runuri", () => {
+  let s = libSession.fresh(0);
+  for (let i = 0; i < 15; i++) {
+    s = { ...s, count: 1, totalDivine: 1 };
+    s = libSession.reset(s, 1000 + i).state;
+  }
+  assert.strictEqual(s.history.length, libSession.HISTORY_MAX);
+  assert.strictEqual(s.history[0].endedAt, 1014);
+});
+t("session.sanitize: date corupte nu arunca si pastreaza istoricul valid", () => {
+  const s = libSession.sanitize({ totalDivine: "x", count: -3, seen: { a: "2", b: 0 }, history: [{ count: 1, totalDivine: 3 }] }, 42);
+  assert.strictEqual(s.totalDivine, 0);
+  assert.strictEqual(s.count, 0);
+  assert.deepStrictEqual(s.seen, { a: 2 });
+  assert.strictEqual(s.history.length, 1);
+  assert.strictEqual(s.startedAt, 42);
+});
+
+// ---------- overlaystyle (setari overlay validate) ----------
+const libOverlay = require("../lib/overlaystyle");
+t("overlaystyle.normalize: valorile implicite", () => {
+  assert.deepStrictEqual(libOverlay.normalize({}), libOverlay.DEFAULTS);
+  assert.deepStrictEqual(libOverlay.normalize(null), libOverlay.DEFAULTS);
+});
+t("overlaystyle.normalize: clamp pe interval + culori valide", () => {
+  const s = libOverlay.normalize({ opacity: 9, fontSize: 99, scale: 0.1, text: "#AABBCC", accent: "red" });
+  assert.strictEqual(s.opacity, 1);
+  assert.strictEqual(s.fontSize, 24);
+  assert.strictEqual(s.scale, 0.7);
+  assert.strictEqual(s.text, "#aabbcc");
+  assert.strictEqual(s.accent, libOverlay.DEFAULTS.accent);
+});
+t("overlaystyle.patch: pastreaza campurile neatinse", () => {
+  const s = libOverlay.patch({ opacity: 0.5, fontSize: 18 }, { fontSize: 20 });
+  assert.strictEqual(s.opacity, 0.5);
+  assert.strictEqual(s.fontSize, 20);
+  assert.strictEqual(s.text, libOverlay.DEFAULTS.text);
+});
+
 // ---------- report ----------
 Promise.all(pending).then(() => {
   console.log(`\n[test] ${passed} trecute, ${failed} esuate`);

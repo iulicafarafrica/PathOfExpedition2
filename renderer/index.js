@@ -9,10 +9,18 @@ const sndBtn = document.getElementById("snd");
 const nmBtn = document.getElementById("nm");
 const minvalEl = document.getElementById("minval");
 const minOnEl = document.getElementById("minOn");
+const minChipsEl = document.getElementById("minChips");
+const alertMinSel = document.getElementById("alertMinSel");
+const sessTotalEl = document.getElementById("sessTotal");
+const sessRateEl = document.getElementById("sessRate");
+const sessStatsEl = document.getElementById("sessStats");
+const sessHistoryEl = document.getElementById("sessHistory");
 let overlayOn = false;
 let soundOn = false;
 let namesOn = true;   // numele itemului in overlay (false = ascuns)
 let minDiv = 0;      // prag de afisare (in Divine); 0 = arata tot
+let alertMin = 1;    // alerta sonora: item nou de la N Divine in sus
+let lastSession = null;
 let curRows = [];
 // prag pt "market mover": variatie pe 7 zile peste care marcăm itemul ca pump
 const PUMP_PCT = 15;
@@ -57,6 +65,45 @@ function setPricesTime(ts, stale) {
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ---------- sesiune: total pe run, divine/ora, best, istoric ----------
+function fmtDiv(n) {
+  const v = Number(n) || 0;
+  if (v >= 100) return String(Math.round(v));
+  return v.toFixed(v >= 10 ? 1 : 2).replace(/\.?0+$/, "") || "0";
+}
+function sessionRate(run) {
+  const ms = Math.max((run.endedAt || 0) - (run.startedAt || 0), 60000);
+  return ((run.totalDivine || 0) / (ms / 3600000)).toFixed(1);
+}
+function renderSession(s) {
+  if (!s) return;
+  lastSession = s;
+  sessTotalEl.textContent = fmtDiv(s.totalDivine) + " div";
+  sessRateEl.textContent = (s.count > 0 && s.durationMs >= 60000)
+    ? T("session.rate", { n: s.perHour.toFixed(1) })
+    : "—";
+  const best = s.best ? T("session.best", { name: s.best.name, n: fmtDiv(s.best.value) }) : "—";
+  sessStatsEl.textContent = T("session.stats", { count: s.count || 0, best });
+  const hist = Array.isArray(s.history) ? s.history : [];
+  if (!hist.length) {
+    sessHistoryEl.innerHTML = `<div class="empty">${esc(T("session.empty"))}</div>`;
+    return;
+  }
+  const pad = (x) => String(x).padStart(2, "0");
+  sessHistoryEl.innerHTML = hist.map((run) => {
+    const d = new Date(run.startedAt || run.endedAt || 0);
+    const when = Number.isNaN(d.getTime())
+      ? "—"
+      : `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const row = T("session.row", {
+      total: fmtDiv(run.totalDivine),
+      count: run.count || 0,
+      rate: sessionRate(run),
+    });
+    return `<div class="sess-run"><span class="sd">${esc(when)}</span><span class="sr">${esc(row)}</span></div>`;
+  }).join("");
 }
 
 // mini-grafic 7 zile din sparkline.data (aceeasi logica precum in overlay)
@@ -142,11 +189,16 @@ async function boot() {
   setOvlBtn(!!cfg.overlay);
   setSndBtn(!!cfg.soundAlert);
   setNmBtn(!cfg.hideNames);
+  alertMin = cfg.alertMin || 1;
+  alertMinSel.value = String(alertMin);
   minDiv = cfg.minDivine || 0;
   minOnEl.checked = minDiv > 0;
   const wanted = String(minDiv);
   const known = [...minvalEl.options].some((o) => o.value === wanted);
   minvalEl.value = known && minDiv > 0 ? wanted : "1";
+  syncMinChips();
+  applyOverlayStyleToUI(cfg.overlayStyle);
+  renderSession(cfg.session);
   fontSel.value = cfg.font || FontUI.DEFAULT;
   gameLangSel.value = cfg.gameLang || "auto";
   langAuto = !!cfg.langAuto;
@@ -179,7 +231,16 @@ sndBtn.onclick = async () => {
   const r = await window.api.setSoundAlert(!soundOn);
   if (r.ok) {
     setSndBtn(r.on);
-    statusEl.textContent = T(r.on ? "status.alertOn" : "status.alertOff");
+    if (r.min) alertMin = r.min;
+    statusEl.textContent = r.on ? T("status.alertOn", { n: alertMin }) : T("status.alertOff");
+  }
+};
+alertMinSel.onchange = async () => {
+  const r = await window.api.setAlertMin(Number(alertMinSel.value));
+  if (r && r.ok) {
+    alertMin = r.min;
+    alertMinSel.value = String(alertMin);
+    statusEl.textContent = T("status.alertFrom", { n: alertMin });
   }
 };
 nmBtn.onclick = async () => {
@@ -190,10 +251,17 @@ nmBtn.onclick = async () => {
   }
 };
 // prag minim: checkbox-ul e on/off, select-ul alege valoarea (in Divine)
+function syncMinChips() {
+  const active = minDiv > 0 ? minDiv : 0;
+  minChipsEl.querySelectorAll(".qchip").forEach((chip) => {
+    chip.classList.toggle("on", Number(chip.dataset.min) === active);
+  });
+}
 async function applyMin(v) {
   const r = await window.api.setMinValue(v);
   if (r && r.ok) minDiv = r.minDivine || 0;
   minOnEl.checked = minDiv > 0;
+  syncMinChips();
   render(curRows, null);   // aplica pragul imediat, fara re-scan
   statusEl.textContent = minDiv > 0 ? T("status.hidingBelow", { n: minDiv }) : T("status.showingAll");
 }
@@ -204,6 +272,19 @@ minvalEl.onchange = () => {
   minOnEl.checked = true;   // alegerea unei valori porneste filtrul automat
   applyMin(parseFloat(minvalEl.value) || 1);
 };
+// chip-uri rapide: Toate / 1+ / 10+ (aceeasi stare ca checkbox-ul + select-ul)
+minChipsEl.querySelectorAll(".qchip").forEach((chip) => {
+  chip.onclick = () => {
+    const v = Number(chip.dataset.min) || 0;
+    if (v > 0) {
+      minvalEl.value = String(v);
+      minOnEl.checked = true;
+    } else {
+      minOnEl.checked = false;
+    }
+    applyMin(v);
+  };
+});
 
 // ---------- Options (meniu dropdown: limba + font + actiuni utilitare) ----------
 const optBtn = document.getElementById("optBtn");
@@ -211,6 +292,11 @@ const optMenu = document.getElementById("optMenu");
 const fontSel = document.getElementById("fontSel");
 const langSel = document.getElementById("langSel");
 const gameLangSel = document.getElementById("gameLangSel");
+const ovlOpacityEl = document.getElementById("ovlOpacity");
+const ovlFontEl = document.getElementById("ovlFont");
+const ovlScaleEl = document.getElementById("ovlScale");
+const ovlTextEl = document.getElementById("ovlText");
+const ovlAccentEl = document.getElementById("ovlAccent");
 let langAuto = false;   // UI urmeaza limba clientului de joc
 // numele limbilor in limba lor (nu se traduc)
 const GAME_LANG_NAMES = { en: "English", de: "Deutsch", fr: "Français", es: "Español", pt: "Português (BR)", ru: "Русский", ja: "日本語", ko: "한국어", th: "ไทย" };
@@ -245,6 +331,48 @@ langSel.onchange = async () => {
     relang();
   }
 };
+// stilul overlay-ului: slider-ele trimit live (persist=false), iar la release
+// (change) salvam in config. Culorile sunt input-uri native type=color.
+function applyOverlayStyleToUI(s) {
+  const st = s || {};
+  if (Number.isFinite(Number(st.opacity))) ovlOpacityEl.value = String(st.opacity);
+  if (Number.isFinite(Number(st.fontSize))) ovlFontEl.value = String(st.fontSize);
+  if (Number.isFinite(Number(st.scale))) ovlScaleEl.value = String(Math.round(Number(st.scale) * 100));
+  if (/^#[0-9a-f]{6}$/i.test(st.text || "")) ovlTextEl.value = st.text;
+  if (/^#[0-9a-f]{6}$/i.test(st.accent || "")) ovlAccentEl.value = st.accent;
+}
+function readOverlayStyle() {
+  return {
+    opacity: +ovlOpacityEl.value,
+    fontSize: +ovlFontEl.value,
+    scale: (+ovlScaleEl.value) / 100,
+    text: ovlTextEl.value,
+    accent: ovlAccentEl.value,
+  };
+}
+let ovlStyleTimer = null;
+function sendOverlayStyle(persist) {
+  const style = readOverlayStyle();
+  if (ovlStyleTimer) { clearTimeout(ovlStyleTimer); ovlStyleTimer = null; }
+  ovlStyleTimer = setTimeout(async () => {
+    ovlStyleTimer = null;
+    const r = await window.api.setOverlayStyle(style, persist);
+    if (r && r.ok) applyOverlayStyleToUI(r.style);
+  }, persist ? 0 : 90);
+}
+[ovlOpacityEl, ovlFontEl, ovlScaleEl, ovlTextEl, ovlAccentEl].forEach((el) => {
+  el.addEventListener("input", () => sendOverlayStyle(false));
+  el.addEventListener("change", () => sendOverlayStyle(true));
+});
+document.getElementById("ovlStyleReset").onclick = async () => {
+  const r = await window.api.setOverlayStyle(null, true);
+  if (r && r.ok) {
+    applyOverlayStyleToUI(r.style);
+    statusEl.textContent = T("status.overlayStyleReset");
+  }
+};
+window.api.onOverlayStyle((s) => applyOverlayStyleToUI(s));
+
 window.api.onFont((f) => { FontUI.apply(f); fontSel.value = f; });
 document.getElementById("scan").onclick = async () => {
   statusEl.textContent = T("status.scanning");
@@ -327,14 +455,24 @@ document.getElementById("optDebug").onclick = () => {
 
 window.api.onScan((data) => {
   if (data.pricesAt) setPricesTime(data.pricesAt, data.pricesStale);
+  if (data.session) renderSession(data.session);
   render(data.rows, data.error, data.panelMissing, data.errorKey);
 });
+window.api.onSession((s) => renderSession(s));
+document.getElementById("sessReset").onclick = async () => {
+  const r = await window.api.resetSession();
+  if (r && r.ok) {
+    renderSession(r.session);
+    statusEl.textContent = T("session.done");
+  }
+};
 
-// alerta sonora: item nou de la 1 Divine in sus
+// alerta sonora: item nou de la pragul ales in sus
 window.api.onAlert((d) => {
   ping();
   const n = (d && d.count) || 1;
-  statusEl.textContent = n > 1 ? T("status.alertMany", { n }) : T("status.alertOne");
+  const min = (d && d.min) || alertMin;
+  statusEl.textContent = n > 1 ? T("status.alertMany", { n, min }) : T("status.alertOne", { min });
 });
 
 // avertismente din main proces (audit S6): ex. fereastra principala s-a blocat.
@@ -579,6 +717,7 @@ function relang() {
   setOvlBtn(overlayOn); setSndBtn(soundOn); setNmBtn(namesOn);
   setPricesTime(lastPricesAt, lastPricesStale);
   render(curRows, null);
+  if (lastSession) renderSession(lastSession);
   renderChips(); renderChase(); updatePlan(); renderCombos();
   if (guideEnabled) renderGuide();
   statusEl.textContent = T(hasRegion ? "status.regionSet" : "status.chooseRegion");

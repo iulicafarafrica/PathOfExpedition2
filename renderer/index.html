@@ -59,7 +59,8 @@
   .opt-wrap { position: relative; display: inline-block; }
   .opt-menu {
     position:absolute; top:100%; right:0; margin-top:4px; z-index:40;
-    min-width:214px; padding:8px; display:flex; flex-direction:column; gap:6px;
+    min-width:238px; max-height:calc(100vh - 76px); overflow-y:auto;
+    padding:8px; display:flex; flex-direction:column; gap:6px;
     background:#efe3c4; border:1px solid var(--line); border-radius:5px;
     box-shadow:0 6px 18px rgba(0,0,0,.4);
   }
@@ -126,6 +127,45 @@
     box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
   .upd-banner:hover { text-decoration:underline; }
+  /* ---------- filtre rapide (langa "Min.") ---------- */
+  .qchips { display:flex; gap:2px; }
+  .qchip { padding:2px 7px; font-size:10px; font-weight:bold; border-radius:9px; box-shadow:none; }
+  .qchip.on { background:linear-gradient(#b7d9a0,#9cc47e); box-shadow:inset 0 0 0 1px #5f8a4a; }
+  /* ---------- sesiune (total pe run, divine/ora, istoric) ---------- */
+  .session {
+    border:1px solid rgba(138,111,71,.45); border-radius:4px;
+    background:rgba(255,255,255,.18); padding:5px 8px;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .sess-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .sess-title { font-size:10px; font-weight:bold; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-soft); }
+  .sess-total { font-size:15px; font-weight:bold; color:var(--gold); }
+  .sess-rate { font-size:11px; font-weight:bold; color:var(--green); }
+  .sess-reset { margin-left:auto; padding:2px 7px; font-size:10px; }
+  .sess-stats { font-size:11px; color:var(--ink-soft); }
+  .sess-hist-wrap summary {
+    cursor:pointer; font-size:10px; font-weight:bold; color:var(--ink-soft);
+    letter-spacing:.4px; text-transform:uppercase;
+  }
+  .sess-hist-wrap summary:hover { color:var(--ink); }
+  .sess-history { display:flex; flex-direction:column; gap:2px; margin-top:3px; max-height:110px; overflow:auto; }
+  .sess-run {
+    display:flex; gap:8px; font-size:10.5px; color:var(--ink-soft);
+    border-bottom:1px solid rgba(138,111,71,.2); padding:1px 0;
+  }
+  .sess-run:last-child { border-bottom:0; }
+  .sess-run .sd { flex-shrink:0; font-weight:bold; color:var(--ink); opacity:.8; }
+  .sess-run .sr { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* ---------- setari overlay (in meniul Options) ---------- */
+  .opt-sec {
+    font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:.6px;
+    color:var(--ink-soft); margin-top:1px;
+  }
+  .opt-row input[type="range"] { width:104px; accent-color:var(--gold); }
+  .opt-row input[type="color"] {
+    width:34px; height:22px; padding:0; border:1px solid var(--line);
+    border-radius:3px; background:none; cursor:pointer;
+  }
   /* ---------- header: titlu + tab-uri (underline) + gear ---------- */
   .appbar { display:flex; align-items:center; gap:10px; }
   .tabs { flex:1; display:flex; gap:2px; justify-content:center; align-items:center; }
@@ -302,8 +342,24 @@
         <label class="opt-row" data-i18n-title="opt.gameLangTitle" title="Language of the game client — used to recognise item names read from the screen"><span data-i18n="opt.gameLang">Game language</span> <select id="gameLangSel"></select></label>
         <label class="opt-row"><span data-i18n="opt.font">Font</span> <select id="fontSel"></select></label>
         <div class="opt-div"></div>
+        <label class="opt-row"><span data-i18n="opt.alertFrom">Alert from</span>
+          <select id="alertMinSel">
+            <option value="1">≥1 div</option>
+            <option value="5">≥5 div</option>
+            <option value="10">≥10 div</option>
+            <option value="20">≥20 div</option>
+          </select>
+        </label>
         <button id="snd" class="opt-item">Alert: OFF</button>
         <button id="nm" class="opt-item">Names: ON</button>
+        <div class="opt-div"></div>
+        <div class="opt-sec" data-i18n="opt.overlaySec">Overlay</div>
+        <label class="opt-row"><span data-i18n="opt.ovlOpacity">Opacity</span><input id="ovlOpacity" type="range" min="0.2" max="1" step="0.05"></label>
+        <label class="opt-row"><span data-i18n="opt.ovlFont">Text size</span><input id="ovlFont" type="range" min="10" max="24" step="1"></label>
+        <label class="opt-row"><span data-i18n="opt.ovlScale">Bar scale</span><input id="ovlScale" type="range" min="70" max="160" step="5"></label>
+        <label class="opt-row"><span data-i18n="opt.ovlText">Text color</span><input id="ovlText" type="color"></label>
+        <label class="opt-row"><span data-i18n="opt.ovlAccent">Highlight color</span><input id="ovlAccent" type="color"></label>
+        <button id="ovlStyleReset" class="opt-item" data-i18n="opt.ovlReset">Reset overlay style</button>
         <div class="opt-div"></div>
         <button id="optRefresh" class="opt-item" data-i18n="opt.refresh">Refresh prices</button>
         <button id="optOcr" class="opt-item" data-i18n="opt.ocr">Check OCR</button>
@@ -327,6 +383,11 @@
         <option value="10">≥10 div</option>
       </select>
     </label>
+    <div id="minChips" class="qchips">
+      <button class="qchip" data-min="0" data-i18n="prices.all">All</button>
+      <button class="qchip" data-min="1">1+</button>
+      <button class="qchip" data-min="10">10+</button>
+    </div>
     <span class="sep"></span>
     <button id="sel" data-i18n="prices.selectRegion">Select region</button>
     <button id="ovl">Overlay: OFF</button>
@@ -336,6 +397,19 @@
   <div id="updBanner" class="upd-banner" hidden></div>
   <div id="status" class="status">Loading…</div>
   <div id="list" class="list"><div class="empty" data-i18n="prices.noPrices">No prices yet.</div></div>
+  <div id="session" class="session">
+    <div class="sess-top">
+      <span class="sess-title" data-i18n="session.title">Session</span>
+      <span id="sessTotal" class="sess-total">0 div</span>
+      <span id="sessRate" class="sess-rate">—</span>
+      <button id="sessReset" class="sess-reset" data-i18n="session.reset">Reset run</button>
+    </div>
+    <div id="sessStats" class="sess-stats">0 drops</div>
+    <details class="sess-hist-wrap">
+      <summary><span data-i18n="session.history">Previous runs</span></summary>
+      <div id="sessHistory" class="sess-history"></div>
+    </details>
+  </div>
   <div class="spacer"></div>
   </div><!-- /tab-prices -->
   <div id="tab-planner" class="panel" hidden>

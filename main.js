@@ -12,6 +12,8 @@ const libText = require("./lib/text");
 const libPrices = require("./lib/prices");
 const libUpdate = require("./lib/update");
 const libNet = require("./lib/net");
+const libSession = require("./lib/session");
+const libOverlayStyle = require("./lib/overlaystyle");
 const { computeCropRect, intersect } = require("./lib/capture");
 
 // iconita din taskbar: in dev electron.exe are iconita Electron daca fereastra nu are
@@ -99,6 +101,7 @@ let runeOverlayWin = null;   // overlay separat, doar pt rune (Rune Planner)
 let lastScanPayload = null;  // ultimul scan reusit (repornit odata cu overlay-ul)
 let lastCaptureK = 0;   // raportul px fizici/DIP al ultimei capturi (alinierea chipurilor)
 let config = loadConfig();
+let session = loadSession();   // statisticile runului curent (persistate in session.json)
 let pollTimer = null;
 let selectOpen = false;   // True cand box-ul de selectie e deschis (nu fac scan)
 let ocrProc = null;       // procesul PowerShell pentru Windows OCR (cald)
@@ -488,7 +491,7 @@ let scanning = false;        // guard: nu suprapunem doua scan-uri (poll + buton
 let lastScanHash = null;     // hash-ul ultimei capturi OCR-uite (skip daca ecranul n-a schimbat)
 let lastScanLang = "";       // limba jocului la ultimul scan (cache-ul de imagine depinde de ea)
 let lastScanPricesAt = 0;    // fetchedAt-ul preturilor de la ultimul OCR (refacem daca s-au schimbat)
-const ALERT_MIN_DIVINE = 1;  // alerta sonora: item (stack) de la 1 Divine in sus
+const ALERT_MIN_CHOICES = [1, 5, 10, 20];  // praguri oferite in UI pentru alerta sonora
 let lastAlertSet = new Set();// itemele scumpe de la scanul anterior (ca sa nu sunăm repetat)
 
 // ---------- health-check OCR (butonul "Check OCR") ----------
@@ -1010,7 +1013,9 @@ function configPath() {
   return path.join(app.getPath("userData"), "config.json");
 }
 function loadConfig() {
-  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false, runeOverlay: false, soundAlert: false, minDivine: 0, hideNames: false, font: "segoe", lang: "en", langAuto: true, gameLang: "auto" };
+  const defaults = { league: "Forbidden Rites", region: null, runeRegion: null, overlay: false,
+    runeOverlay: false, soundAlert: false, alertMin: 1, minDivine: 0, hideNames: false, font: "segoe",
+    lang: "en", langAuto: true, gameLang: "auto", overlayStyle: libOverlayStyle.normalize({}) };
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
     log("loadConfig: read", raw.length, "chars");
@@ -1018,6 +1023,9 @@ function loadConfig() {
     // migrare: pana acum "en" era doar default-ul, nu o alegere explicita -> auto.
     // O limba aleasa manual (de/fr/...) ramane fixa.
     if (cfg.langAuto === undefined) cfg.langAuto = cfg.lang === "en";
+    // valori venite din config-uri vechi (sau editate manual) nu trebuie sa strice UI-ul
+    cfg.alertMin = ALERT_MIN_CHOICES.includes(Number(cfg.alertMin)) ? Number(cfg.alertMin) : 1;
+    cfg.overlayStyle = libOverlayStyle.normalize(cfg.overlayStyle);
     log("loadConfig: OK");
     return cfg;
   } catch (e) {
@@ -1034,6 +1042,41 @@ function saveConfig() {
     log("saveConfig: scris OK");
   } catch (e) {
     log("saveConfig: ERROR", e.message);
+  }
+}
+
+// ---------- sesiune (total pe run, divine/ora, istoric) ----------
+// Fisier separat de config: se scrie doar cand apar iteme noi / la reset, ca sa
+// nu adaugam I/O in bucla de scan (care poate rula la fiecare 3s).
+function sessionPath() {
+  return path.join(app.getPath("userData"), "session.json");
+}
+function loadSession() {
+  try {
+    return libSession.sanitize(JSON.parse(fs.readFileSync(sessionPath(), "utf8")), Date.now());
+  } catch {
+    return libSession.fresh(Date.now());
+  }
+}
+let sessionSaveTimer = null;
+function saveSession() {
+  if (sessionSaveTimer) return;
+  sessionSaveTimer = setTimeout(() => {
+    sessionSaveTimer = null;
+    const data = JSON.stringify(session);
+    fs.mkdir(path.dirname(sessionPath()), { recursive: true }, () => {
+      fs.writeFile(sessionPath(), data, () => {});
+    });
+  }, 800);
+  if (sessionSaveTimer.unref) sessionSaveTimer.unref();
+}
+function flushSession() {
+  try {
+    if (sessionSaveTimer) { clearTimeout(sessionSaveTimer); sessionSaveTimer = null; }
+    fs.mkdirSync(path.dirname(sessionPath()), { recursive: true });
+    fs.writeFileSync(sessionPath(), JSON.stringify(session));
+  } catch (e) {
+    log("flushSession: ERROR", e.message);
   }
 }
 
@@ -1244,12 +1287,18 @@ async function doScan(force) {
     lastScanLang = gameLang;
     lastScanPricesAt = priceCache.fetchedAt;
     log("doScan: rows=", rows.length, "(filtered", filtered + ")", JSON.stringify(rows.map((r) => r.qty + "x" + r.name)));
-    // ALERTA SONORA: item nou (fata de scanul anterior) cu valoare >= 1 Divine.
+    // SESIUNE: doar itemele noi fata de scanul anterior intra in total (itemele
+    // care raman pe ecran nu se numara de doua ori).
+    const sess = libSession.addRows(session, rows, Date.now());
+    session = sess.state;
+    if (sess.added > 0) saveSession();
+    // ALERTA SONORA: item nou (fata de scanul anterior) cu valoare >= pragul ales.
     // Comparăm setul de nume scumpe ca sa sunăm o singura data per item nou.
+    const alertMin = Number(config.alertMin) || 1;
     const highNow = new Set();
     let newHigh = 0;
     for (const r of rows) {
-      if ((r.totalDivine || 0) >= ALERT_MIN_DIVINE) {
+      if ((r.totalDivine || 0) >= alertMin) {
         const key = String(r.matchedName || r.name).toLowerCase();
         highNow.add(key);
         if (!lastAlertSet.has(key)) newHigh++;
@@ -1257,8 +1306,8 @@ async function doScan(force) {
     }
     lastAlertSet = highNow;
     if (config.soundAlert && newHigh > 0) {
-      log("alert: new items >= " + ALERT_MIN_DIVINE + " div:", newHigh);
-      if (win && !win.isDestroyed()) win.webContents.send("alert", { count: newHigh });
+      log("alert: new items >= " + alertMin + " div:", newHigh);
+      if (win && !win.isDestroyed()) win.webContents.send("alert", { count: newHigh, min: alertMin });
     }
     return { rows, at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale };
   } catch (e) {
@@ -1274,6 +1323,7 @@ async function runScan(force) {
   scanning = true;
   try {
     const r = await doScan(force === true);
+    r.session = libSession.summary(session, Date.now());
     if (!r.unchanged) broadcast(r);
     return r;
   } finally {
@@ -1444,7 +1494,7 @@ function notifyRuneOverlayState() {
 }
 
 // ---------- IPC ----------
-ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale, portable: IS_PORTABLE, guideEnabled: GUIDE_ENABLED }));
+ipcMain.handle("get-config", () => ({ ...config, version: app.getVersion(), availableLeagues: AVAILABLE_LEAGUES, pricesAt: priceCache.fetchedAt, pricesStale, portable: IS_PORTABLE, guideEnabled: GUIDE_ENABLED, session: libSession.summary(session, Date.now()) }));
 // ---------- Rune Planner (baza de date + reverse-lookup) ----------
 // Datele (data/runes.json + data/recipes.json) se incarca o singura data.
 planner.loadData();
@@ -1625,12 +1675,29 @@ ipcMain.handle("scan-now", async () => {
 // primeste doar boolean, nimic altceva
 ipcMain.handle("toggle-overlay", (_e, on) => toggleOverlay(on === true));
 ipcMain.handle("toggle-rune-overlay", (_e, on) => { const res = toggleRuneOverlay(on === true); notifyRuneOverlayState(); return res; });
-// alerta sonora la item >= 1 Divine: doar boolean, persistat in config
+// alerta sonora: on/off + pragul in Divine (1/5/10/20), ambele persistate in config
 ipcMain.handle("set-sound-alert", (_e, on) => {
   config.soundAlert = on === true;
   saveConfig();
   lastAlertSet = new Set();   // re-armăm: la urmatorul scan valutăm ce e pe ecran
-  return { ok: true, on: config.soundAlert };
+  return { ok: true, on: config.soundAlert, min: config.alertMin };
+});
+ipcMain.handle("set-alert-min", (_e, v) => {
+  const n = Number(v);
+  config.alertMin = ALERT_MIN_CHOICES.includes(n) ? n : 1;
+  saveConfig();
+  lastAlertSet = new Set();   // prag nou -> reevaluam itemele de pe ecran
+  return { ok: true, min: config.alertMin };
+});
+// sesiunea curenta: resetare (runul incheiat merge in istoricul ultimelor 10)
+ipcMain.handle("reset-session", () => {
+  const res = libSession.reset(session, Date.now());
+  session = res.state;
+  saveSession();
+  const sum = libSession.summary(session, Date.now());
+  if (win && !win.isDestroyed()) win.webContents.send("session", sum);
+  log("session: reset; previous run count=", res.run.count, "total=", res.run.totalDivine.toFixed(2));
+  return { ok: true, session: sum, run: res.run };
 });
 // prag de afisare (in Divine): ascunde itemele sub valoarea aleasa. 0 = arata tot.
 ipcMain.handle("set-min-value", (_e, v) => {
@@ -1647,6 +1714,22 @@ ipcMain.handle("set-hide-names", (_e, on) => {
   saveConfig();
   sendOverlay(lastScanPayload);   // re-trimite catre overlay ca sa aplice schimbarea
   return { ok: true, hideNames: config.hideNames };
+});
+// stilul overlay-ului (opacitate, marime, culori): validat in lib/overlaystyle.js.
+// persist=true doar la finalul tragerii slider-ului -> configul nu se rescrie la
+// fiecare pixel de input; in timpul tragerii trimitem doar evenimentul live.
+function pushOverlayStyle() {
+  if (overlayWin && !overlayWin.isDestroyed()) {
+    overlayWin.webContents.send("app-overlay-style", config.overlayStyle);
+  }
+}
+ipcMain.handle("set-overlay-style", (_e, patch, persist) => {
+  config.overlayStyle = patch === null
+    ? libOverlayStyle.normalize({})
+    : libOverlayStyle.patch(config.overlayStyle, patch);
+  if (persist === true) saveConfig();
+  pushOverlayStyle();
+  return { ok: true, style: config.overlayStyle };
 });
 // fontul UI (token din FontUI.TOKENS): persistat + trimis live la ambele overlay-uri
 function pushFontToOverlays() {
@@ -1813,6 +1896,7 @@ if (isSingleInstance) app.whenReady().then(() => {
 // la inchidere: opresc polling-ul si OMOR procesul PowerShell OCR (cald) ca sa nu ramana orfan
 app.on("will-quit", () => {
   try { flushLog(); } catch {}
+  try { flushSession(); } catch {}
   try { stopPoll(); } catch {}
   try { if (ocrProc && !ocrProc.killed) ocrProc.kill(); } catch {}
   try { stopFgProc(); } catch {}

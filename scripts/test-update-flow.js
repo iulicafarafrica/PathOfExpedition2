@@ -12,7 +12,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const libUpdate = require("D:/ExiledExchange2/expedition/lib/update.js");
+const libUpdate = require("../lib/update.js");
 
 let pass = 0, fail = 0;
 function t(name, cond, extra) {
