@@ -323,7 +323,7 @@ Code signing for releases is in progress and will remove most of these flags.
 - **No runtime dependencies**: the shipped app is Electron + this repo's own code - no third-party packages at runtime
 - **Strict CSP**: `script-src 'self'` in every renderer (no `unsafe-inline`), all external links behind a host allowlist
 - **Performance**: native GPU crop for the screen region, memoised price lookups, cached name maps, buffered async logging
-- **Quality**: the main-process logic lives in small pure modules (`lib/`) covered by **77 regression tests**, plus a pre-build gate that refuses to package if an invariant breaks - all running in CI on every push
+- **Quality**: the main-process logic lives in small pure modules (`lib/`) covered by **78 regression tests**, plus a pre-build gate that refuses to package if an invariant breaks - all running in CI on every push
 - **Rune detection**: pure image template matching (33 bundled rune sprites), no OCR
 - **Bundled database**: `data/runes.json` (33 runes) + `data/recipes.json` (322 combinations, patch 0.5.5), loaded once, fully offline
 - **Localized names**: `data/names/<lang>.json` (official trade names, localized → English) and `data/names/rev-<lang>.json` (English → localized, for display), generated from the official trade static data; the game language is read from `poe2_production_Config.ini`, so no manual setup

@@ -94,6 +94,9 @@ function flushLog() {
 log("=== START ===");
 log("configPath:", path.join(app.getPath ? "(app not ready)" : "", "config.json"));
 
+// praguri oferite in UI pentru alerta sonora; declarat INAINTE de loadConfig(),
+// care il valideaza (altfel ReferenceError la pornire si configul s-ar reseta)
+const ALERT_MIN_CHOICES = [1, 5, 10, 20];
 let win = null;
 let debugWin = null;   // fereastra Debug (log OCR)
 let overlayWin = null;   // overlay-ul transparent peste panoul din joc
@@ -491,7 +494,6 @@ let scanning = false;        // guard: nu suprapunem doua scan-uri (poll + buton
 let lastScanHash = null;     // hash-ul ultimei capturi OCR-uite (skip daca ecranul n-a schimbat)
 let lastScanLang = "";       // limba jocului la ultimul scan (cache-ul de imagine depinde de ea)
 let lastScanPricesAt = 0;    // fetchedAt-ul preturilor de la ultimul OCR (refacem daca s-au schimbat)
-const ALERT_MIN_CHOICES = [1, 5, 10, 20];  // praguri oferite in UI pentru alerta sonora
 let lastAlertSet = new Set();// itemele scumpe de la scanul anterior (ca sa nu sunăm repetat)
 
 // ---------- health-check OCR (butonul "Check OCR") ----------

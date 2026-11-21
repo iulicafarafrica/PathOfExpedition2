@@ -623,6 +623,18 @@ t("overlaystyle.patch: pastreaza campurile neatinse", () => {
   assert.strictEqual(s.text, libOverlay.DEFAULTS.text);
 });
 
+// ---------- ordinea de initializare in main.js ----------
+t("main.js: constantele folosite de loadConfig sunt declarate inainte de apel", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const src = fs.readFileSync(path.join(__dirname, "..", "main.js"), "utf8");
+  const call = src.indexOf("let config = loadConfig();");
+  const decl = src.indexOf("const ALERT_MIN_CHOICES");
+  assert.ok(call > 0, "apelul loadConfig() trebuie sa existe");
+  assert.ok(decl > 0, "ALERT_MIN_CHOICES trebuie declarat");
+  assert.ok(decl < call, "ALERT_MIN_CHOICES trebuie declarat INAINTE de loadConfig() (altfel TDZ -> config resetat la fiecare pornire)");
+});
+
 // ---------- report ----------
 Promise.all(pending).then(() => {
   console.log(`\n[test] ${passed} trecute, ${failed} esuate`);
