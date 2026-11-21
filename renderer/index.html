@@ -163,6 +163,7 @@
   .corelbl { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:bold; }
   .corelbl input[type="checkbox"] { width:14px; height:14px; margin:0; accent-color:var(--gold); cursor:pointer; }
   .btns button, .btns select { padding:3px 7px; font-size:11px; }
+  .btn-group { display:inline-flex; gap:3px; }
   #minval { width:72px; }
   button, select {
     font-family:inherit; font-size:12px; font-weight:bold; color:var(--ink);
@@ -173,6 +174,7 @@
   }
   button:hover, select:hover { background:linear-gradient(var(--btn-hi-top), var(--btn-hi)); }
   button:active { box-shadow:inset 0 1px 3px rgba(0,0,0,.35); }
+  button:disabled { opacity:.55; cursor:default; }
   .opt-wrap { position: relative; display: inline-block; }
   .opt-menu {
     position:absolute; top:100%; right:0; margin-top:4px; z-index:40;
@@ -516,7 +518,10 @@
     <button id="sel" data-i18n="prices.selectRegion">Select region</button>
     <button id="ovl">Overlay: OFF</button>
     <span class="sep"></span>
-    <button id="scan" class="primary" data-i18n="prices.scanNow">Scan now</button>
+    <span class="btn-group">
+      <button id="refreshPrices" data-i18n="opt.refresh">Refresh prices</button>
+      <button id="scan" class="primary" data-i18n="prices.scanNow">Scan now</button>
+    </span>
   </div>
   <div id="updBanner" class="upd-banner" hidden></div>
   <div id="status" class="status">Loading…</div>

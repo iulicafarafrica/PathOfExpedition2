@@ -854,6 +854,13 @@ function valueTier(div) {
   if (div >= 1) return "high";
   return null;
 }
+// anunta UI-ul cand snapshot-ul de preturi s-a schimbat (la pornire / la 30 min /
+// la refresh manual), ca timestamp-ul din footer sa fie mereu real
+function notifyPrices() {
+  if (win && !win.isDestroyed()) {
+    win.webContents.send("prices", { at: priceCache.fetchedAt, stale: pricesStale });
+  }
+}
 async function fetchPrices(league) {
   log("fetchPrices: START league=", league);
   const headers = {
@@ -914,13 +921,14 @@ async function fetchPrices(league) {
   }
   if (Object.keys(map).length === 0) {
     // poe.ninja / retea indisponibila: recadere la ultimul snapshot local (aceeasi liga)
-    if (loadPricesSnapshot(league)) return priceCache.map;
+    if (loadPricesSnapshot(league)) { notifyPrices(); return priceCache.map; }
   }
   pricesStale = false;
   priceCache = { map, keys: Object.keys(map), keysByLength, fetchedAt: Date.now() };
   clearPriceMemo();
   savePricesSnapshot();
   log("fetchPrices: DONE total", Object.keys(map).length, "items");
+  notifyPrices();
   return map;
 }
 // --- matching fuzzy (OCR garble: "Chaos"->"Chao", "Jeweller's"->"Jeweller s") ---
@@ -1193,6 +1201,41 @@ async function captureRegion(region) {
 // PANEL_ANCHOR vine din rows.js (aceeasi lista e folosita si la respingerea titlului
 // ca rand de item). E specific panoului de runeshaping si NU apare in market -> gate:
 // daca lipseste din OCR, nu suntem pe panou si nu arat nimic (evita false positives).
+// Pretuieste un rand OCR din cache-ul curent. Folosit si la refresh-ul manual,
+// ca preturile sa se schimbe imediat in lista fara o noua captura/OCR.
+function priceRow(r) {
+  const p = lookupPrice(r.name);
+  const qty = r.qty || 1;
+  r.price = p ? p.price : null;            // pret UNITAR in Divine (raw)
+  r.matchedName = p ? p.name : null;
+  r.category = p ? p.category : null;      // pt linkul catre pagina itemului pe poe.ninja
+  r.trend = p ? p.trend : null;            // "up" | "down" | "flat" | null
+  r.trendPct = p ? p.trendPct : null;      // variatia in % pe 7 zile (pe chipuri)
+  r.trendData = p ? p.trendData : null;    // seria de 7 valori (mini-graficul din overlay)
+  r.icon = p ? p.icon : null;              // iconita itemului (CDN poecdn)
+  r.totalDivine = p ? p.price * qty : null;// TOTALUL stack-ului in Divine (pt tier)
+  // Pretul afisat = TOTALUL stack-ului; pentru qty>1 aratam si unitar.
+  const total = p ? displayPrice(p.price * qty, "auto") : null;
+  const unit = (p && qty > 1) ? displayPrice(p.price, "auto") : null;
+  // afisare ca in overlay: pret UNITAR, iar totalul stack-ului in paranteza cand sunt 2x+
+  r.display = total
+    ? { value: total.value, currency: total.currency, text: (unit ? unit.text : total.text) + (unit ? ` (${total.text})` : "") }
+    : null;
+  // pt overlay: pretul UNITAR principal, iar in paranteza TOTALUL doar daca qty>1
+  const u = p ? displayPrice(p.price, "auto") : null;
+  const t = (p && qty > 1) ? displayPrice(p.price * qty, "auto") : null;
+  r.dispUnit = u ? u.text : null;
+  r.dispTotal = t ? t.text : null;
+  return p;
+}
+function repriceLastRows() {
+  for (const r of lastRows) {
+    priceRow(r);
+    r.tier = valueTier(r.totalDivine);
+    r.displayName = uiNameOf(r);
+  }
+  lastScanPricesAt = priceCache.fetchedAt;
+}
 async function doScan(force) {
   if (selectOpen) { log("doScan: selectOpen, skipped"); return { rows: [], error: null };
   }
@@ -1266,28 +1309,7 @@ async function doScan(force) {
     const kept = [];
     let filtered = 0;   // cate linii au fost respinse ca zgomot (nu le logam individual)
     for (const r of rows) {
-      const p = lookupPrice(r.name);
-      const qty = r.qty || 1;
-        r.price = p ? p.price : null;            // pret UNITAR in Divine (raw)
-        r.matchedName = p ? p.name : null;
-        r.category = p ? p.category : null;      // pt linkul catre pagina itemului pe poe.ninja
-        r.trend = p ? p.trend : null;            // "up" | "down" | "flat" | null
-        r.trendPct = p ? p.trendPct : null;      // variatia in % pe 7 zile (pe chipuri)
-        r.trendData = p ? p.trendData : null;    // seria de 7 valori (mini-graficul din overlay)
-        r.icon = p ? p.icon : null;              // iconita itemului (CDN poecdn)
-      r.totalDivine = p ? p.price * qty : null;  // TOTALUL stack-ului in Divine (pt tier)
-      // Pretul afisat = TOTALUL stack-ului; pentru qty>1 aratam si unitar.
-      const total = p ? displayPrice(p.price * qty, "auto") : null;
-      const unit = (p && qty > 1) ? displayPrice(p.price, "auto") : null;
-      // afisare ca in overlay: pret UNITAR, iar totalul stack-ului in paranteza cand sunt 2x+
-      r.display = total
-        ? { value: total.value, currency: total.currency, text: (unit ? unit.text : total.text) + (unit ? ` (${total.text})` : "") }
-        : null;
-      // pt overlay: pretul UNITAR principal, iar in paranteza TOTALUL doar daca qty>1
-      const u = p ? displayPrice(p.price, "auto") : null;
-      const t = (p && qty > 1) ? displayPrice(p.price * qty, "auto") : null;
-      r.dispUnit = u ? u.text : null;
-      r.dispTotal = t ? t.text : null;
+      const p = priceRow(r);
       if (!p && !r.explicit) { filtered++; continue; }   // zgomot (chat/fereastra straina)
       kept.push(r);
     }
@@ -1675,6 +1697,11 @@ ipcMain.handle("set-league", async (_e, league) => {
 ipcMain.handle("refresh-prices", async () => {
   try {
     const map = await fetchPrices(config.league || "Forbidden Rites");
+    // re-pretuieste randurile deja afisate, fara o noua captura OCR
+    repriceLastRows();
+    if (lastRows.length) {
+      broadcast({ rows: lastRows, at: Date.now(), pricesAt: priceCache.fetchedAt, pricesStale });
+    }
     return { ok: true, count: Object.keys(map).length, at: priceCache.fetchedAt, stale: pricesStale };
   } catch (e) {
     return { ok: false, error: String(e) };

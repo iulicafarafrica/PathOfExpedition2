@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld("api", {
   toggleRuneOverlay: (on) => ipcRenderer.invoke("toggle-rune-overlay", on),
   onScan: (cb) => ipcRenderer.on("scan", (_e, data) => cb(data)),
   onAlert: (cb) => ipcRenderer.on("alert", (_e, data) => cb(data)),
+  onPrices: (cb) => ipcRenderer.on("prices", (_e, data) => cb(data)),
   onSession: (cb) => ipcRenderer.on("session", (_e, data) => cb(data)),
   onOverlayStyle: (cb) => ipcRenderer.on("app-overlay-style", (_e, s) => cb(s)),
   // avertismente din main proces (ex. fereastra blocata) - audit S6

@@ -150,7 +150,7 @@ Your region and league are saved. If you move the game window, re-select the reg
 | | |
 | --- | --- |
 | **Offline cache** | If poe.ninja or your network is down, it keeps running on the last snapshot (marked "cached, offline") and recovers on its own. |
-| **Auto-refresh** | Prices reload every 30 min. **Refresh prices** forces it. |
+| **Auto-refresh** | Prices reload every 30 min. The **Refresh prices** button in the toolbar (or **⚙ → Refresh prices**) forces an update and re-prices the items already on screen. |
 | **Update check** | Checks GitHub Releases on launch and every 30 min. **Update now** downloads and launches it - and it picks the file that matches your install: a portable build updates with the portable build, an installed copy with the installer. The download is **SHA-256 + size verified** and is refused if it doesn't match. |
 | **Self-healing** | An unexpected error offers **Restart / Quit** instead of failing silently, and a frozen window is reloaded automatically. |
 | **Check OCR & Debug window** | Verify the OCR engine and see the raw OCR lines and app log when something reads wrong. |

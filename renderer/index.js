@@ -396,15 +396,23 @@ document.getElementById("scan").onclick = async () => {
   render(r.rows, r.error, r.panelMissing, r.errorKey);
   statusEl.textContent = T("status.done", { n: r.rows.length });
 };
-document.getElementById("optRefresh").onclick = async () => {
+async function refreshPricesNow() {
+  const btn = document.getElementById("refreshPrices");
+  if (btn) btn.disabled = true;
   statusEl.textContent = T("status.loadingPrices");
   const r = await window.api.refreshPrices();
+  if (btn) btn.disabled = false;
   if (r.at) setPricesTime(r.at, r.stale);
   statusEl.textContent = r.ok
     ? (r.stale ? T("status.pricesCached", { n: r.count }) : T("status.pricesUpdated", { n: r.count }))
     : T("status.error", { error: r.error });
+  return r;
+}
+document.getElementById("optRefresh").onclick = async () => {
+  await refreshPricesNow();
   closeOpt();
 };
+document.getElementById("refreshPrices").onclick = () => refreshPricesNow();
 document.getElementById("optOcr").onclick = async () => {
   statusEl.textContent = T("status.ocrChecking");
   const r = await window.api.checkOcr();
@@ -475,6 +483,7 @@ window.api.onScan((data) => {
   render(data.rows, data.error, data.panelMissing, data.errorKey);
 });
 window.api.onSession((s) => renderSession(s));
+window.api.onPrices((d) => { if (d && d.at) setPricesTime(d.at, d.stale); });
 document.getElementById("sessReset").onclick = async () => {
   const r = await window.api.resetSession();
   if (r && r.ok) {
