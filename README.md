@@ -341,39 +341,65 @@ Dev: `npm start` runs it unpackaged, `npm run preflight` runs the gate, `npm run
 
 ## Changelog
 
-### v1.3.1
-- **Refresh prices** button in the Prices toolbar (also in **⚙ → Refresh prices**).
-- Refreshing re-prices the items already on screen immediately, without a new OCR scan.
-- The **Prices updated** timestamp now updates after every fetch (launch, 30-minute auto-refresh and manual refresh).
+### 1.3.1 - 2026-11-21
 
-### v1.3.0
-- **UI themes**: Parchment, Dark and Light, selectable from **⚙ → Theme** and saved between sessions. Only the app window changes - the overlay and OCR are untouched.
-- UI scaled up by 30% for readability, with larger Other tools cards.
-- **Buy me a coffee** now links to [ko-fi.com/nr5xdev](https://ko-fi.com/nr5xdev).
+#### Added
+- Refresh prices button in the Prices toolbar, also available under Options > Refresh prices.
+
+#### Changed
+- Manual price refresh now re-prices the items already displayed without starting a new OCR scan.
+
+#### Fixed
+- The Prices updated timestamp now updates after every fetch: on launch, on the automatic 30-minute refresh, and on manual refresh.
+
+### 1.3.0 - 2026-11-21
+
+#### Added
+- UI themes: Parchment, Dark and Light. The selected theme is saved between sessions.
+- Larger interface scale for improved readability.
+
+#### Changed
+- Larger cards on the Other tools tab.
+- The Buy me a coffee link now points to [ko-fi.com/nr5xdev](https://ko-fi.com/nr5xdev).
+- Theme changes apply only to the application window; the in-game overlay and OCR behaviour are unaffected.
+
+#### Security
+- External URL allowlist reduced to the links actually used by the application.
 
 <details>
-<summary><b>Older releases (v1.2.x)</b></summary>
+<summary>Older releases (1.2.x)</summary>
 
 <br>
 
-### v1.2.2
-- Other tools titles: **PoE 1 and 2 Chat Alert** and **PoE 1 & 2 Trade Watcher**.
-- Both buttons renamed to **Get tool**.
+### 1.2.2 - 2026-11-21
 
-### v1.2.1
-- Both Other tools buttons link to [nr5x.dev/path-of-exile](https://nr5x.dev/path-of-exile).
-- Updated descriptions for Chat Alert and Trade Watcher; external URL allowlist updated.
+#### Changed
+- Other tools entries renamed to PoE 1 and 2 Chat Alert and PoE 1 & 2 Trade Watcher.
+- Both action buttons renamed to Get tool.
 
-### v1.2.0
-- Configurable sound alert threshold: **1 / 5 / 10 / 20 Divine**.
-- Quick filter chips: **All / 1+ / 10+**.
-- **Session summary**: total Divine per run, drop count, best drop, Divine/hour, Reset run and the last 10 runs.
-- **Overlay style settings**: opacity, text size, bar scale, text and highlight colors.
-- Fixed a startup bug that could reset the saved config.
+### 1.2.1 - 2026-11-21
+
+#### Changed
+- Both Other tools buttons now link to [nr5x.dev/path-of-exile](https://nr5x.dev/path-of-exile).
+- Updated descriptions for Chat Alert and Trade Watcher.
+
+#### Security
+- External URL allowlist updated; the previous GitHub and Chrome Web Store entries were removed.
+
+### 1.2.0 - 2026-11-21
+
+#### Added
+- Configurable sound alert threshold: 1, 5, 10 or 20 Divine.
+- Quick filter chips for the price list: All, 1+ and 10+.
+- Session summary with total Divine per run, drop count, best drop, Divine per hour, Reset run, and the last 10 runs.
+- Overlay style settings: opacity, text size, bar scale, text colour and highlight colour.
+
+#### Fixed
+- A startup issue that could reset the saved configuration due to the initialisation order of the alert threshold value.
 
 </details>
 
-The full, file-based history is in [CHANGELOG.md](CHANGELOG.md).
+The complete history is maintained in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
