@@ -339,6 +339,44 @@ Dev: `npm start` runs it unpackaged, `npm run preflight` runs the gate, `npm run
 
 ---
 
+## Changelog
+
+### v1.3.1
+- **Refresh prices** button in the Prices toolbar (also in **⚙ → Refresh prices**).
+- Refreshing re-prices the items already on screen immediately, without a new OCR scan.
+- The **Prices updated** timestamp now updates after every fetch (launch, 30-minute auto-refresh and manual refresh).
+
+### v1.3.0
+- **UI themes**: Parchment, Dark and Light, selectable from **⚙ → Theme** and saved between sessions. Only the app window changes - the overlay and OCR are untouched.
+- UI scaled up by 30% for readability, with larger Other tools cards.
+- **Buy me a coffee** now links to [ko-fi.com/nr5xdev](https://ko-fi.com/nr5xdev).
+
+<details>
+<summary><b>Older releases (v1.2.x)</b></summary>
+
+<br>
+
+### v1.2.2
+- Other tools titles: **PoE 1 and 2 Chat Alert** and **PoE 1 & 2 Trade Watcher**.
+- Both buttons renamed to **Get tool**.
+
+### v1.2.1
+- Both Other tools buttons link to [nr5x.dev/path-of-exile](https://nr5x.dev/path-of-exile).
+- Updated descriptions for Chat Alert and Trade Watcher; external URL allowlist updated.
+
+### v1.2.0
+- Configurable sound alert threshold: **1 / 5 / 10 / 20 Divine**.
+- Quick filter chips: **All / 1+ / 10+**.
+- **Session summary**: total Divine per run, drop count, best drop, Divine/hour, Reset run and the last 10 runs.
+- **Overlay style settings**: opacity, text size, bar scale, text and highlight colors.
+- Fixed a startup bug that could reset the saved config.
+
+</details>
+
+The full, file-based history is in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## Feedback & support
 
 Got an idea, a bug or a feature request? [Open an issue](https://github.com/iulicafarafrica/PathOfExpedition2/issues).
