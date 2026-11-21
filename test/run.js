@@ -454,16 +454,18 @@ t("net.isExternalAllowed: linkurile din app raman permise", () => {
   assert.ok(libNet.isExternalAllowed("https://github.com/iulicafarafrica/PathOfExpedition2/releases"));
   assert.ok(libNet.isExternalAllowed("https://poe.ninja/poe2/economy/forbiddenrites/currency/chaos-orb"));
 });
-t("net.isExternalAllowed: tab-ul Other tools (Poe2ChatAlert + Chrome Web Store)", () => {
-  assert.ok(libNet.isExternalAllowed("https://github.com/iulicafarafrica/Poe2ChatAlert"));
-  assert.ok(libNet.isExternalAllowed("https://github.com/iulicafarafrica/Poe2ChatAlert/"));
-  assert.ok(libNet.isExternalAllowed("https://chromewebstore.google.com/detail/poe2-trade-watcher/cijhdepfikmgngilainmcokgblkbbdkp"));
+t("net.isExternalAllowed: tab-ul Other tools duce la hub-ul nr5x.dev", () => {
+  assert.ok(libNet.isExternalAllowed("https://nr5x.dev/path-of-exile"));
+  assert.ok(libNet.isExternalAllowed("https://nr5x.dev/path-of-exile/"));
 });
 t("net.isExternalAllowed: orice altceput e refuzat", () => {
   assert.ok(!libNet.isExternalAllowed("https://evil.example.com/"));
   assert.ok(!libNet.isExternalAllowed("https://reddit.com/r/other/comments/1uhtpix/x"));
   assert.ok(!libNet.isExternalAllowed("https://docs.google.com/forms/d/abc"));
-  assert.ok(!libNet.isExternalAllowed("https://chromewebstore.google.com/detail/poe2-trade-watcher/cijhdepfikmgngilainmcokgblkbbdkp/extra"));
+  assert.ok(!libNet.isExternalAllowed("https://nr5x.dev/other"));
+  assert.ok(!libNet.isExternalAllowed("https://nr5x.dev.evil.com/path-of-exile"));
+  assert.ok(!libNet.isExternalAllowed("https://evil-nr5x.dev/path-of-exile"));
+  assert.ok(!libNet.isExternalAllowed("http://nr5x.dev/path-of-exile"));  // fara https
   assert.ok(!libNet.isExternalAllowed("https://github.com/iulicafarafrica/PathOfExpedition2evil"));
   assert.ok(!libNet.isExternalAllowed("http://poe.ninja/poe2/economy/a/b/c"));  // fara https
   assert.ok(!libNet.isExternalAllowed("file:///C:/Windows/System32/calc.exe"));
